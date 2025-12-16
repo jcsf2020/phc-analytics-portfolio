@@ -1,6 +1,18 @@
 # PHC Analytics Portfolio
+## Contexto do Projeto
 
-Projeto de analytics desenvolvido para simular um cenário real de dados empresariais (PHC ERP), com foco em modelação analítica, KPIs e preparação para dashboards.
+Este projeto simula um cenário real de analytics empresarial baseado num ERP (PHC),
+com o objetivo de transformar dados operacionais de vendas em informação analítica
+útil para apoio à decisão.
+
+O foco está em:
+- Estruturar dados segundo boas práticas de **modelação dimensional**
+- Criar uma **camada analítica reutilizável**
+- Definir **KPIs de negócio claros** (vendas, margem, clientes, artigos)
+- Preparar dados prontos a consumir por ferramentas de BI (Power BI / Tableau / Metabase)
+
+Este tipo de pipeline é típico de contextos reais de **Data Analytics / Analytics Engineering**,
+onde dados transacionais precisam de ser consolidados, validados e analisados.
 
 ## Objetivo
 Demonstrar competências práticas em:
