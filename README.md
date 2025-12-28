@@ -1,46 +1,84 @@
-# PHC Analytics Portfolio
-## Contexto do Projeto
+PHC Analytics — Data Engineering Portfolio
 
-Este projeto simula um cenário real de analytics empresarial baseado num ERP (PHC),
-com o objetivo de transformar dados operacionais de vendas em informação analítica
-útil para apoio à decisão.
+Projeto de Data Engineering e Analytics Engineering que simula um cenário real de dados empresariais (PHC ERP / e-commerce), com foco em pipelines de ingestão, normalização, processamento incremental e cálculo de KPIs de negócio.
 
-O foco está em:
-- Estruturar dados segundo boas práticas de **modelação dimensional**
-- Criar uma **camada analítica reutilizável**
-- Definir **KPIs de negócio claros** (vendas, margem, clientes, artigos)
-- Preparar dados prontos a consumir por ferramentas de BI (Power BI / Tableau / Metabase)
+Este projeto foi construído com mentalidade de produção, não como notebook exploratório.
 
-Este tipo de pipeline é típico de contextos reais de **Data Analytics / Analytics Engineering**,
-onde dados transacionais precisam de ser consolidados, validados e analisados.
+Objetivo
 
-## Objetivo
 Demonstrar competências práticas em:
-- Modelação dimensional (fact + dimensões)
-- Transformação e análise de dados com Python
-- Definição de KPIs de negócio
-- Preparação de dados para ferramentas de BI
+	•	Arquitetura de pipelines de dados
+	•	Ingestão de dados via API
+	•	Normalização e padronização de schemas
+	•	Processamento incremental com controlo de estado
+	•	Modelação analítica e KPIs de negócio
+	•	Qualidade, contratos de dados e testes automáticos
 
-## Conteúdo do Projeto
-- `01_mock_data_final.ipynb` — Notebook principal com todo o pipeline analítico
-- `fact_venda.csv` — Tabela de factos (vendas)
-- `dim_*.csv` — Tabelas de dimensão (clientes, artigos, tempo, vendedores)
-- `outputs/` — KPIs e tabelas finais exportadas em CSV
-- `src/phc_analytics/` — Package Python com código auxiliar
+Arquitetura
 
-## KPIs Calculados
-- Faturação total
-- Margem total e %
-- Nº de vendas
-- Ticket médio
-- Faturação por cliente
-- Rankings de clientes e artigos
+data/
+Dados mock e fontes externas
 
-## Stack Técnica
-- Python
-- Pandas
-- Jupyter Notebook
-- Git / GitHub
+src/phc_analytics/
+	•	staging/ — ingestão e normalização
+	•	analytics/ — KPIs e métricas de negócio
+	•	utils/ — utilitários comuns
 
-## Estado
-Versão inicial estável — v0.1.0
+app.py
+Camada de apresentação (Streamlit)
+
+out/
+Outputs analíticos (facts, dimensions, KPIs)
+
+Pipeline de Dados
+	1.	Ingestão
+Consumo de APIs (ex: PrestaShop), preparado para integração real com ERP / Odoo e persistência controlada de dados brutos.
+	2.	Normalização
+Padronização de schemas, suporte a múltiplos formatos de input, mapeamento de aliases e validação de tipos.
+	3.	Incremental Processing
+Pipeline incremental com watermarks por entidade, execução idempotente e estado persistido em ficheiro (_pipeline_state.json).
+	4.	Camada Analítica
+Geração de tabelas fact e dimensão, KPIs reutilizáveis e dados prontos para BI ou consumo downstream.
+
+KPIs Implementados
+	•	Faturação total
+	•	Número de documentos
+	•	Número de clientes
+	•	Ticket médio
+	•	Evolução temporal
+	•	Rankings de clientes e produtos
+
+Qualidade e Contratos de Dados
+	•	Testes automáticos com pytest
+	•	Validação de chaves primárias e estrangeiras
+	•	Garantias de não-null e consistência
+	•	Falha cedo quando o contrato de dados é violado
+
+Stack Técnica
+
+Python
+Pandas
+Streamlit
+pytest
+uv
+Git / GitHub
+
+Preparado para evolução para PostgreSQL, SQLAlchemy e orquestração (Prefect / Airflow).
+
+Execução
+
+make run
+
+ou
+
+uv run streamlit run app.py
+
+Estado do Projeto
+
+Pipeline funcional, incremental e testado.
+Preparado para integração real com PrestaShop e Odoo.
+
+Autor
+
+João Fonseca
+Data / Big Data Engineer
