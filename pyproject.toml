@@ -13,6 +13,19 @@ dependencies = [
     "streamlit>=1.50.0",
 ]
 
+<<<<<<< HEAD
 [build-system]
 requires = ["uv_build>=0.9.17,<0.10.0"]
 build-backend = "uv_build"
+=======
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+>>>>>>> 57e0fd3 (test: add pipeline contract (partition filter) + fix package imports)
