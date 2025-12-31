@@ -1,11 +1,11 @@
-from src.phc_analytics.staging.documents import load_documents_mock
-from src.phc_analytics.models.fact_documents import build_fact_documents
-from src.phc_analytics.models.dim_clients import build_dim_clients
-from src.phc_analytics.models.dim_time import build_dim_time
-from src.phc_analytics.analytics.kpis import kpis_top_cards
-from src.phc_analytics.analytics.timeseries import faturacao_mensal
-from src.phc_analytics.quality.checks import run_quality_gate_fact_documents
-from src.phc_analytics.storage.writer import write_parquet, write_csv
+from phc_analytics.staging.documents import load_documents_mock
+from phc_analytics.models.fact_documents import build_fact_documents
+from phc_analytics.models.dim_clients import build_dim_clients
+from phc_analytics.models.dim_time import build_dim_time
+from phc_analytics.analytics.kpis import kpis_top_cards
+from phc_analytics.analytics.timeseries import faturacao_mensal
+from phc_analytics.quality.checks import run_quality_gate_fact_documents
+from phc_analytics.storage.writer import write_parquet, write_csv
 
 
 def run_pipeline(out_dir: str = "out", partition_fact: bool = False):
