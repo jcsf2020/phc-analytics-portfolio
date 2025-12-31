@@ -12,3 +12,17 @@ archive/
 
 extras/
 archive/
+
+# Data Engineering outputs (pipelines)
+out/
+out_*/
+*.parquet
+*.csv
+
+# Local test artifacts
+out_check/
+out_part/
+out_test/
+
+# Notebooks outputs (future-proof)
+.ipynb_checkpoints/
