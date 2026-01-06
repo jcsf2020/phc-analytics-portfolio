@@ -1,7 +1,7 @@
 [project]
 name = "phc-analytics"
 version = "0.1.0"
-description = "Add your description here"
+description = "PHC / PrestaShop analytics pipeline (portfolio)"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -10,22 +10,21 @@ dependencies = [
     "matplotlib>=3.9.4",
     "pandas>=2.3.3",
     "plotly>=6.5.0",
+    "snowflake-connector-python>=3.18.0",
     "streamlit>=1.50.0",
 ]
 
-<<<<<<< HEAD
-[build-system]
-requires = ["uv_build>=0.9.17,<0.10.0"]
-build-backend = "uv_build"
-=======
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
 ]
+
+[build-system]
+requires = ["uv_build>=0.9.17,<0.10.0"]
+build-backend = "uv_build"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
->>>>>>> 57e0fd3 (test: add pipeline contract (partition filter) + fix package imports)
