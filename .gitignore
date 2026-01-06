@@ -26,3 +26,5 @@ out_test/
 
 # Notebooks outputs (future-proof)
 .ipynb_checkpoints/
+# Runtime logs
+logs/
