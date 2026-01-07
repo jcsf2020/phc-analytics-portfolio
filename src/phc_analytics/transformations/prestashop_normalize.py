@@ -91,3 +91,100 @@ def normalize_products(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
         )
 
     return normalized
+
+
+def normalize_orders(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Normaliza Order Headers vindos do PrestaShop.
+
+    Input esperado (raw):
+    {
+        "orders": [ {...}, {...} ]
+    }
+
+    Output:
+    Lista de orders normalizadas (1 dict por encomenda).
+    """
+    if "orders" not in raw:
+        raise DataValidationError("Missing 'orders' key in raw data")
+
+    normalized: List[Dict[str, Any]] = []
+
+    for o in raw["orders"]:
+        prestashop_order_id = o.get("prestashop_order_id")
+        prestashop_customer_id = o.get("prestashop_customer_id")
+        status = o.get("status")
+        created_at = o.get("created_at")
+
+        if prestashop_order_id is None:
+            raise DataValidationError("Order missing prestashop_order_id")
+        if prestashop_customer_id is None:
+            raise DataValidationError("Order missing prestashop_customer_id")
+        if not status:
+            raise DataValidationError("Order missing status")
+        if not created_at:
+            raise DataValidationError("Order missing created_at")
+
+        normalized.append(
+            {
+                "prestashop_order_id": int(prestashop_order_id),
+                "prestashop_customer_id": int(prestashop_customer_id),
+                "status": str(status),
+                "total_paid": float(o.get("total_paid", 0)),
+                "currency": o.get("currency"),
+                "created_at": created_at,
+                "updated_at": o.get("updated_at"),
+            }
+        )
+
+    return normalized
+
+
+def normalize_order_lines(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Normaliza Order Lines vindas do PrestaShop.
+
+    Input esperado (raw):
+    {
+        "orders": [
+            {
+                "prestashop_order_id": ...,
+                "lines": [ {...}, {...} ]
+            }
+        ]
+    }
+
+    Output:
+    Lista de linhas normalizadas (1 dict por linha).
+    """
+    if "orders" not in raw:
+        raise DataValidationError("Missing 'orders' key in raw data")
+
+    normalized: List[Dict[str, Any]] = []
+
+    for o in raw["orders"]:
+        prestashop_order_id = o.get("prestashop_order_id")
+        if prestashop_order_id is None:
+            raise DataValidationError("Order missing prestashop_order_id (for lines)")
+
+        lines = o.get("lines", [])
+        for line in lines:
+            prestashop_product_id = line.get("prestashop_product_id")
+            quantity = line.get("quantity")
+
+            if prestashop_product_id is None:
+                raise DataValidationError("Order line missing prestashop_product_id")
+            if quantity is None:
+                raise DataValidationError("Order line missing quantity")
+
+            normalized.append(
+                {
+                    "prestashop_order_id": int(prestashop_order_id),
+                    "prestashop_product_id": int(prestashop_product_id),
+                    "quantity": float(quantity),
+                    "unit_price": float(line.get("unit_price")) if line.get("unit_price") is not None else None,
+                    "line_total": float(line.get("line_total")) if line.get("line_total") is not None else None,
+                }
+            )
+
+    return normalized
