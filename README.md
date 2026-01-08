@@ -1,39 +1,15 @@
-# PHC Analytics — Data Engineering Analytics MVP
+# PHC Analytics — Data Engineering Analytics Pipeline (MVP)
 
-Projeto de Data Engineering + Analytics desenvolvido como MVP técnico, focado em pipeline de dados, cálculo de KPIs e camada analítica final, simulando um cenário real de dados empresariais (PHC ERP).
+End-to-end **Data Engineering & Analytics pipeline** desenvolvido como MVP técnico, simulando um cenário real de dados empresariais (PHC / e-commerce), com foco em arquitetura, qualidade de dados e modelação analítica.
+
+O projeto demonstra práticas reais de **Data Engineering moderno**, desde ingestão até outputs prontos para BI.
+
+---
 
 ## Objetivo
-Transformar dados operacionais em informação estratégica, com arquitetura preparada para ligação à BD PHC quando o schema real estiver disponível.
 
-## Arquitetura
-- data/                 # Fonte de dados mock
-- src/phc_analytics/
-  - staging/            # Ingestão e normalização
-  - analytics/          # KPIs e séries temporais
-- app.py                # Camada de apresentação (Streamlit)
+Construir um pipeline **reprodutível, testável e escalável** que transforma dados operacionais em modelos analíticos (star schema), prontos para consumo por dashboards, BI ou data science.
 
-## KPIs
-- Vendas totais
-- Número de documentos
-- Número de clientes
-- Ticket médio
-- Faturação mensal
-- Crescimento mês-a-mês
-- Top clientes
-- Vendas por tipo de documento
+---
 
-## Stack
-Python, Pandas, Streamlit, uv  
-Preparado para PostgreSQL, SQLAlchemy e orquestração.
-
-## Execução
-uv run streamlit run app.py
-
-## Autor
-João Fonseca — Data / Big Data Engineer
-
-## Decisões Técnicas
-
-- Separação entre ingestão, analytics e apresentação para facilitar manutenção e evolução.
-- KPIs isolados em funções reutilizáveis para permitir cálculo via pandas ou SQL.
-- Estrutura preparada para escalar de dados mock para base de dados real sem refatoração.
+## Arquitetura (Source -> Silver -> Gold -> Serving)
