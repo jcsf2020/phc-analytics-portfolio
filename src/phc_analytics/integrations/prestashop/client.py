@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 import json
 import os
 import urllib.request
@@ -160,7 +160,7 @@ class PrestaShopClient:
 
     def get_orders_mock(self) -> Dict[str, Any]:
         """
-        Dados mock de Orders + Order Lines.
+        Dados mock de Orders.
         """
         return {
             "orders": [
@@ -186,6 +186,23 @@ class PrestaShopClient:
                             "line_total": 29.99,
                         },
                     ],
-                }
+                },
+                {
+                    "prestashop_order_id": 5001,
+                    "prestashop_customer_id": 2,
+                    "status": "paid",
+                    "total_paid": 19.99,
+                    "currency": "EUR",
+                    "created_at": "2024-02-12T09:00:00",
+                    "updated_at": "2024-02-12T09:30:00",
+                    "lines": [
+                        {
+                            "prestashop_product_id": 100,
+                            "quantity": 1,
+                            "unit_price": 19.99,
+                            "line_total": 19.99,
+                        }
+                    ],
+                },
             ]
         }
