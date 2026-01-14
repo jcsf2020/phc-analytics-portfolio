@@ -1,124 +1,67 @@
-from __future__ import annotations
-
-from datetime import date, datetime
-from pathlib import Path
-import csv
-from typing import Any, Dict, List
-
-from src.phc_analytics.config.pipeline_settings import GOLD_DIR, SERVING_DIR, WATERMARK_FIELD
-from src.phc_analytics.config.pipeline_state import get_watermark, set_watermark
-
-from src.phc_analytics.integrations.prestashop.client import PrestaShopClient, PrestaShopConfig
-from src.phc_analytics.pipeline.incremental import filter_incremental_by_watermark
-from src.phc_analytics.transformations.prestashop_normalize import (
-    normalize_customers,
-    normalize_products,
-    normalize_orders,
-    normalize_order_lines,
-)
-from src.phc_analytics.transformations.dim_customer import build_dim_customer
-from src.phc_analytics.transformations.dim_product import build_dim_product
-from src.phc_analytics.transformations.dim_date import generate_dim_date
-from src.phc_analytics.transformations.fact_orders_enrich import enrich_orders_with_date
-from src.phc_analytics.transformations.fact_order_lines_enrich import enrich_order_lines
-from src.phc_analytics.transformations.agg_sales_by_product import agg_sales_by_product
+from typing import Any, Dict, List, Optional, Union
 
 
-def write_csv(path: Path, rows: List[Dict[str, Any]]) -> None:
-    """
-    Write list[dict] to CSV.
-    CSV = tabular format widely used for BI/Excel.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    if not rows:
-        path.write_text("", encoding="utf-8")
-        return
-
-    fieldnames = list(rows[0].keys())
-    with path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        w.writerows(rows)
+class DataValidationError(Exception):
+    pass
 
 
-def _extract_date_keys_from_orders(orders: List[Dict[str, Any]]) -> List[int]:
-    keys: List[int] = []
-    for o in orders:
-        created_at = o["created_at"]
-        k = int(datetime.fromisoformat(created_at).strftime("%Y%m%d"))
-        keys.append(k)
-    return keys
+def normalize_customers(
+    raw_data: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]],
+) -> List[Dict[str, Any]]:
+    # Accept both envelope dicts and plain lists.
+    # Real pipeline may already extract the list before calling the normalizer.
+    if raw_data is None:
+        return []
 
+    # If list is provided, treat it as the customers array.
+    if isinstance(raw_data, list):
+        customers = raw_data
+    elif isinstance(raw_data, dict):
+        # Envelope forms.
+        if "customers" in raw_data:
+            customers = raw_data.get("customers")
+        elif "customer" in raw_data:
+            customers = raw_data.get("customer")
+        else:
+            # Be resilient: do not hard-fail on shape; return empty.
+            return []
 
-def main() -> None:
-    # --- WATERMARK (incremental state) ---
-    prev_wm = get_watermark("orders")
+        # Normalize envelope content to list
+        if isinstance(customers, dict):
+            customers = [customers]
+        elif customers is None:
+            customers = []
+        elif not isinstance(customers, list):
+            # Unexpected scalar
+            customers = []
+    else:
+        return []
 
-    # 1) SOURCE (Bronze): raw payloads (mock for now)
-    client = PrestaShopClient(PrestaShopConfig(base_url="https://mock"))
-    raw_customers = client.get_customers_mock()
-    raw_products = client.get_products_mock()
-    raw_orders = client.get_orders_mock()
+    out = []
+    for cst in customers:
+        if not isinstance(cst, dict):
+            continue
 
-    # 2) SILVER: normalize + validate
-    customers_silver = normalize_customers(raw_customers)
-    products_silver = normalize_products(raw_products)
-    orders_silver = normalize_orders(raw_orders)
-    order_lines_silver = normalize_order_lines(raw_orders)
+        # Backward-compatible id mapping: accept aliases.
+        if "id" not in cst:
+            for alias in (
+                "prestashop_customer_id",
+                "customer_id",
+                "id_customer",
+                "ps_customer_id",
+            ):
+                if alias in cst and cst.get(alias) is not None:
+                    cst["id"] = cst.get(alias)
+                    break
 
-    # --- INCREMENTAL FILTER (orders) ---
-    inc_orders, new_wm = filter_incremental_by_watermark(
-        orders_silver,
-        watermark_iso=prev_wm,
-        watermark_field=WATERMARK_FIELD,
-    )
+        # If still no id, skip
+        if "id" not in cst or cst.get("id") in (None, ""):
+            continue
 
-    if not inc_orders:
-        print(f"OK: no new orders since watermark={prev_wm}")
-        return
+        out.append(
+            _normalize_customer_row(cst)
+            if "_normalize_customer_row" in globals()
+            else cst
+        )
 
-    inc_order_ids = {o["prestashop_order_id"] for o in inc_orders}
-    inc_order_lines = [
-        line
-        for line in order_lines_silver
-        if line["prestashop_order_id"] in inc_order_ids
-    ]
-
-    # 3) GOLD: dims (full snapshot) + facts (incremental)
-    dim_customer = build_dim_customer(customers_silver)
-    dim_product = build_dim_product(products_silver)
-
-    fact_orders = enrich_orders_with_date(inc_orders)
-    fact_order_lines = enrich_order_lines(inc_order_lines, inc_orders)
-
-    # dim_date derived from incremental orders' created_at range
-    date_keys = _extract_date_keys_from_orders(inc_orders)
-    min_key, max_key = min(date_keys), max(date_keys)
-
-    min_date = date(min_key // 10000, (min_key // 100) % 100, min_key % 100)
-    max_date = date(max_key // 10000, (max_key // 100) % 100, max_key % 100)
-    dim_date_rows = generate_dim_date(min_date, max_date)
-
-    # 4) SERVING: aggregates (incremental)
-    agg_by_product = agg_sales_by_product(fact_order_lines, dim_product)
-
-    # 5) OUTPUTS (layered folders)
-    write_csv(GOLD_DIR / "dim_customer.csv", dim_customer)
-    write_csv(GOLD_DIR / "dim_product.csv", dim_product)
-    write_csv(GOLD_DIR / "dim_date.csv", dim_date_rows)
-
-    write_csv(GOLD_DIR / "fact_orders.csv", fact_orders)
-    write_csv(GOLD_DIR / "fact_order_lines.csv", fact_order_lines)
-
-    write_csv(SERVING_DIR / "agg_sales_by_product.csv", agg_by_product)
-
-    # update watermark only after successful output
-    if new_wm:
-        set_watermark("orders", new_wm)
-
-    print(f"OK: incremental pipeline wrote outputs. watermark {prev_wm} -> {new_wm}")
-
-
-if __name__ == "__main__":
-    main()
+    return out

@@ -11,40 +11,84 @@ class DataValidationError(Exception):
     pass
 
 
-def normalize_customers(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+def normalize_customers(raw: Any) -> List[Dict[str, Any]]:
     """
     Normaliza Customers vindos do PrestaShop.
 
-    Input esperado:
-    {
-        "customers": [
-            {
-                "id": ...,
-                "email": ...,
-                "firstname": ...,
-                "lastname": ...,
-                "active": ...,
-                "date_add": ...,
-                "date_upd": ...
-            }
-        ]
-    }
-    """
-    if "customers" not in raw:
-        raise DataValidationError("Missing 'customers' key in raw data")
+    Suporta input real (Opção A):
+      - envelope dict: {"customers": [...]}
+      - envelope dict: {"customer": {...}} (single)
+      - lista direta: [...]
+      - dict direto: {...} (single)
 
+    Output (contrato Silver):
+      - prestashop_customer_id (int)
+      - email (lower)
+      - firstname, lastname
+      - active (bool)
+      - created_at, updated_at
+
+    Nota: Não rebenta o pipeline por problemas de shape; faz skip de registos inválidos.
+    """
+    if raw is None:
+        return []
+
+    # 1) Extrair customers como list[dict]
+    customers: List[Dict[str, Any]] = []
+
+    if isinstance(raw, list):
+        customers = [c for c in raw if isinstance(c, dict)]
+
+    elif isinstance(raw, dict):
+        # Envelope comum
+        if "customers" in raw:
+            val = raw.get("customers")
+        elif "customer" in raw:
+            val = raw.get("customer")
+        else:
+            # Às vezes vem um dict já no formato de customer
+            val = raw
+
+        if isinstance(val, list):
+            customers = [c for c in val if isinstance(c, dict)]
+        elif isinstance(val, dict):
+            customers = [val]
+        else:
+            customers = []
+
+    else:
+        return []
+
+    # 2) Normalizar
     normalized: List[Dict[str, Any]] = []
 
-    for c in raw["customers"]:
-        if "id" not in c:
-            raise DataValidationError("Customer missing id")
-        if not c.get("email"):
-            raise DataValidationError("Customer missing email")
+    for c in customers:
+        # Resolver id (aceitar aliases)
+        cid = c.get("id")
+        if cid is None:
+            for alias in (
+                "prestashop_customer_id",
+                "customer_id",
+                "id_customer",
+                "ps_customer_id",
+            ):
+                if c.get(alias) is not None:
+                    cid = c.get(alias)
+                    break
+
+        # Skip se não houver id
+        if cid in (None, ""):
+            continue
+
+        email = c.get("email")
+        # Skip se não houver email
+        if not email:
+            continue
 
         normalized.append(
             {
-                "prestashop_customer_id": int(c["id"]),
-                "email": str(c["email"]).lower(),
+                "prestashop_customer_id": int(cid),
+                "email": str(email).lower(),
                 "firstname": c.get("firstname"),
                 "lastname": c.get("lastname"),
                 "active": bool(c.get("active", True)),
