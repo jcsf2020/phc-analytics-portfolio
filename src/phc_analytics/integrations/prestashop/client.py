@@ -22,6 +22,13 @@ class PrestaShopConfig:
     timeout_seconds: int = 20
 
     def validate(self) -> None:
+        # MOCK mode: allow empty base_url when api_key is empty (no real HTTP calls)
+        if not self.api_key and not self.base_url:
+            if self.timeout_seconds <= 0:
+                raise ValueError("timeout_seconds must be > 0")
+            return
+
+        # REAL mode: base_url must be a valid http(s) URL
         if not self.base_url or not self.base_url.startswith(("http://", "https://")):
             raise ValueError("base_url must start with http:// or https://")
         if self.timeout_seconds <= 0:
