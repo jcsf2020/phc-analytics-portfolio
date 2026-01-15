@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, cast
 import os
 import xmlrpc.client
 
@@ -15,12 +15,13 @@ class OdooConfig:
       - url: ex: http://localhost:8069
       - db:  ex: odoo_phc_local
       - login: ex: api-sync@local
-      - password: ex: ApiSync2026!
+      - password: (set via ENV ODOO_PASSWORD)
 
     XML-RPC endpoints:
       - /xmlrpc/2/common  (auth, version)
       - /xmlrpc/2/object  (execute_kw)
     """
+
     url: str
     db: str
     login: str
@@ -35,7 +36,7 @@ class OdooConfig:
         if not self.login:
             raise ValueError("login is required")
         if not self.password:
-            raise ValueError("password is required")
+            raise ValueError("password is required (set ODOO_PASSWORD)")
         if self.timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be > 0")
 
@@ -51,8 +52,12 @@ class OdooClient:
     def __init__(self, cfg: OdooConfig) -> None:
         cfg.validate()
         self._cfg = cfg
-        self._common = xmlrpc.client.ServerProxy(f"{cfg.url}/xmlrpc/2/common", allow_none=True)
-        self._models = xmlrpc.client.ServerProxy(f"{cfg.url}/xmlrpc/2/object", allow_none=True)
+        self._common = xmlrpc.client.ServerProxy(
+            f"{cfg.url}/xmlrpc/2/common", allow_none=True
+        )
+        self._models = xmlrpc.client.ServerProxy(
+            f"{cfg.url}/xmlrpc/2/object", allow_none=True
+        )
         self._uid: Optional[int] = None
 
     @classmethod
@@ -70,16 +75,42 @@ class OdooClient:
         login = os.getenv("ODOO_LOGIN", "").strip()
         password = os.getenv("ODOO_PASSWORD", "").strip()
         timeout_s = int(os.getenv("ODOO_TIMEOUT_SECONDS", "20"))
-        return cls(OdooConfig(url=url, db=db, login=login, password=password, timeout_seconds=timeout_s))
+        return cls(
+            OdooConfig(
+                url=url,
+                db=db,
+                login=login,
+                password=password,
+                timeout_seconds=timeout_s,
+            )
+        )
 
     def version(self) -> Dict[str, Any]:
-        return self._common.version()
+        v = self._common.version()
+        if isinstance(v, dict):
+            return cast(Dict[str, Any], v)
+        # Fallback for unexpected XML-RPC payloads
+        return {"raw": v}
 
     def authenticate(self) -> int:
-        uid = self._common.authenticate(self._cfg.db, self._cfg.login, self._cfg.password, {})
-        if not uid:
-            raise RuntimeError("Odoo auth failed (check DB/login/password; MFA must be disabled for XML-RPC)")
-        self._uid = int(uid)
+        uid_any = self._common.authenticate(
+            self._cfg.db, self._cfg.login, self._cfg.password, {}
+        )
+        if not uid_any:
+            raise RuntimeError(
+                "Odoo auth failed (check DB/login/password; MFA must be disabled for XML-RPC)"
+            )
+
+        # Accept only int or numeric string to avoid XML-RPC marshal edge cases
+        if isinstance(uid_any, int):
+            self._uid = uid_any
+        elif isinstance(uid_any, str) and uid_any.isdigit():
+            self._uid = int(uid_any)
+        else:
+            raise RuntimeError(
+                f"Unexpected uid type from Odoo auth: {type(uid_any).__name__}"
+            )
+
         return self._uid
 
     @property
@@ -97,7 +128,15 @@ class OdooClient:
     ) -> Any:
         if kwargs is None:
             kwargs = {}
-        return self._models.execute_kw(self._cfg.db, self.uid, self._cfg.password, model, method, list(args), kwargs)
+        return self._models.execute_kw(
+            self._cfg.db,
+            self.uid,
+            self._cfg.password,
+            model,
+            method,
+            list(args),
+            kwargs,
+        )
 
     # ---- Convenience helpers ----
 
@@ -116,7 +155,12 @@ class OdooClient:
             model,
             "search_read",
             [domain],
-            {"fields": fields, "limit": int(limit), "offset": int(offset), "order": order},
+            {
+                "fields": fields,
+                "limit": int(limit),
+                "offset": int(offset),
+                "order": order,
+            },
         )
 
     def create(self, model: str, values: Dict[str, Any]) -> int:
@@ -158,6 +202,6 @@ def build_local_client() -> OdooClient:
             url=os.getenv("ODOO_URL", "http://localhost:8069"),
             db=os.getenv("ODOO_DB", "odoo_phc_local"),
             login=os.getenv("ODOO_LOGIN", "api-sync@local"),
-            password=os.getenv("ODOO_PASSWORD", "ApiSync2026!"),
+            password=os.getenv("ODOO_PASSWORD", "").strip(),
         )
     )
