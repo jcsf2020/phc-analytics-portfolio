@@ -1,97 +1,66 @@
-# PHC Analytics — PrestaShop → Odoo Sync & Analytics Pipeline
+# PHC Analytics — Pipeline de Dados Raw → Analytics
 
 ## Contexto
-Pipeline end-to-end que sincroniza dados operacionais de e-commerce (PrestaShop)
-para ERP (Odoo) de forma idempotente e produz datasets analíticos prontos para analytics/BI.
+Pipeline de dados end-to-end que extrai dados operacionais do PrestaShop, armazena em PostgreSQL e transforma em datasets analíticos via materialized views, garantindo performance e escalabilidade para análises e BI.
 
 ---
 
-## Sync PrestaShop → Odoo (mock)
+## Arquitetura
 
-Executa a sincronizacao operacional (clientes, produtos e encomendas):
+- **Raw Layer:** Dados extraídos do PrestaShop armazenados em tabelas brutas no PostgreSQL.
+- **Analytics Layer:** Transformações implementadas como materialized views otimizadas para consultas analíticas.
+- **Sincronização:** Processos idempotentes que garantem integridade e atualização incremental dos dados.
+
+---
+
+## Stack Técnica
+
+- Python para extração e orquestração
+- PostgreSQL como data warehouse e engine analítica
+- Materialized views para performance em consultas analíticas
+- Docker para ambiente local consistente
+
+---
+
+## Como Correr Localmente
+
+1. Levantar o ambiente PostgreSQL via Docker Compose:
 
 ```bash
-python -m src.phc_analytics.pipelines.prestashop_to_odoo
+docker-compose -f docker-compose.odoo.yml up -d db
 ```
 
-O que faz:
-- Upsert idempotente em Odoo
-- Cria chaves tecnicas x_prestashop_*_id
-- Re-executavel sem duplicar dados
-
----
-
-## Gerar Analytics
-
-Gera os datasets analiticos (facts e dimensions):
+2. Executar a pipeline de sincronização e transformação:
 
 ```bash
 python run_pipeline.py
 ```
 
----
-
-## Outputs
-
-Os ficheiros CSV sao gerados em:
-
-```
-./out/
-```
-
-### Facts
-- fact_orders.csv
-- fact_order_lines.csv
-
-### Dimensions
-- dim_customer.csv
-- dim_product.csv
-- dim_date.csv
-
-### Aggregations
-- agg_sales_by_product.csv
+3. Consultar as views materializadas diretamente no PostgreSQL para análise.
 
 ---
 
-## Estrutura do Projeto
+## O Que Demonstra ao Mercado
 
-```
-src/phc_analytics/
-├─ integrations/
-│  ├─ prestashop/
-│  └─ odoo/
-├─ pipelines/
-│  └─ prestashop_to_odoo.py
-├─ transformations/
-├─ quality/
-tests/
-out/
-docker-compose.odoo.yml
-run_pipeline.py
-```
+- Implementação real de pipeline ELT moderno com foco em dados analíticos
+- Uso eficiente de PostgreSQL para armazenar e transformar dados
+- Práticas de engenharia de dados como idempotência e incrementalidade
+- Preparação para escalabilidade e integração com BI
 
 ---
 
-## Testes
+## Estado do Projeto (Sprint Fechado)
 
-Executar todos os testes de qualidade e integracao:
-
-```bash
-pytest -q
-```
-
-Estado atual: todos verdes.
+- Pipeline de extração e carga raw implementado
+- Materialized views analíticas criadas e otimizadas
+- Ambiente local com Docker configurado e funcional
+- Testes de qualidade e integração completos e aprovados
 
 ---
 
-## Proximos Passos
-- Ligar API real do PrestaShop
-- Incremental loads (watermarks)
-- Estados de encomenda (paid, shipped, refunded)
-- Load para Data Warehouse (Snowflake / BigQuery / Postgres)
+## Próximos Passos (Fora do Sprint)
 
----
-
-## Autor
-Joao Fonseca
-Data Engineering · Analytics Engineering · Integracoes ERP
+- Integração com API real do PrestaShop para dados em tempo real
+- Implementação de cargas incrementais com watermarks
+- Enriquecimento com estados de encomenda (paid, shipped, refunded)
+- Exportação e integração com Data Warehouse externo (Snowflake, BigQuery)
