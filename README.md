@@ -1,297 +1,161 @@
-# PHC Analytics — Pipeline de Dados Raw → Analytics
+# PHC Analytics — Production-Ready Data Pipeline (PrestaShop → PostgreSQL)
 
-## Contexto
-Pipeline de dados end-to-end que extrai dados operacionais do PrestaShop, armazena em PostgreSQL e transforma em datasets analíticos via materialized views, garantindo performance e escalabilidade para análises e BI.
+## Overview
 
----
+PHC Analytics is an end-to-end data engineering project that ingests operational data from PrestaShop (customers, products, orders) into PostgreSQL and prepares analytics-ready structures using a layered model: **raw → staging → analytics**.
 
-## Arquitetura
-
-- **Raw Layer:** Dados extraídos do PrestaShop armazenados em tabelas brutas no PostgreSQL.
-- **Analytics Layer:** Transformações implementadas como materialized views otimizadas para consultas analíticas.
-- **Sincronização:** Processos idempotentes que garantem integridade e atualização incremental dos dados.
+This repository is designed to be **reviewable by recruiters and senior engineers**: clear architecture, reproducible setup, cloud-ready execution, idempotent ingestion patterns, and explicit incremental state management.
 
 ---
 
-## Stack Técnica
+## Architecture
 
-- Python para extração e orquestração
-- PostgreSQL como data warehouse e engine analítica
-- Materialized views para performance em consultas analíticas
-- Docker para ambiente local consistente
+### High-level flow
+
+PrestaShop (API)
+→ PostgreSQL **raw** (JSONB, source-of-truth)
+→ PostgreSQL **staging** (state, deduplication, incremental control)
+→ PostgreSQL **analytics** (curated models for BI)
+
+### Data layers
+
+- **raw**
+  - Immutable source preservation
+  - JSONB payloads
+  - Replayable ingestion
+- **staging**
+  - Incremental state (`etl_watermarks`)
+  - Deduplication & orchestration support
+- **analytics**
+  - Curated tables/views
+  - BI- and KPI-ready models
 
 ---
 
-## Como Correr Localmente
+## Tech Stack
 
-1. Levantar o ambiente PostgreSQL via Docker Compose:
+- **Python** — extraction, loading, orchestration
+- **PostgreSQL 15** — storage, transformations, permissions
+- **SQL** — modeling, constraints, incremental logic
+- **Docker Compose** — local reproducibility
+- **Azure Database for PostgreSQL – Flexible Server** — cloud environment
+
+---
+
+## Milestones
+
+### Sprint 3 — Production-Ready SQL Analytics Layer (COMPLETED)
+
+- Versioned SQL bootstrap via migrations
+- Layered schema structure (`raw`, `staging`, `analytics`)
+- Analytics-ready foundation for BI consumption
+
+### Sprint 4 — Azure Cloud Bootstrap & Incremental ETL Foundations (COMPLETED)
+
+Delivered in Azure:
+
+- Azure subscription validated via Azure CLI
+- Resource group created and configured
+- PostgreSQL Flexible Server provisioned (North Europe)
+- Database created: `phc_analytics`
+- Schemas created: `raw`, `staging`, `analytics`
+- Least-privilege ETL role created: `etl_user`
+  - CONNECT on database
+  - USAGE on schemas
+  - DML (SELECT/INSERT/UPDATE/DELETE) on tables
+  - CREATE on `raw` and `staging`
+  - Default privileges configured for future objects
+- Incremental state table created: `staging.etl_watermarks`
+  - Epoch baseline (`1970-01-01`) for first load
+  - Entity-level watermarks:
+    - `prestashop_orders`
+    - `prestashop_customers`
+    - `prestashop_products`
+- Raw ingestion table pattern validated:
+  - JSONB payload
+  - Idempotent upserts using `ON CONFLICT DO UPDATE`
+
+---
+
+## Repository Structure (high level)
+
+- `sql/` — SQL bootstrap and migrations
+- `src/` — pipeline code (connectors, ingestion, transformations)
+- `docker/` — local services
+- `docker-compose*.yml` — reproducible environments
+- `docs/` — architecture notes and runbooks
+
+---
+
+## Local Run (Docker Compose)
+
+### Start PostgreSQL locally
 
 ```bash
-docker-compose -f docker-compose.odoo.yml up -d db
+docker compose up -d db
 ```
 
-2. Executar a pipeline de sincronização e transformação:
+---
+
+## Run the Pipeline (example)
 
 ```bash
 python run_pipeline.py
 ```
 
-3. Consultar as views materializadas diretamente no PostgreSQL para análise.
-
 ---
 
-## O Que Demonstra ao Mercado
+## Azure Run — Current Environment
 
-- Implementação real de pipeline ELT moderno com foco em dados analíticos
-- Uso eficiente de PostgreSQL para armazenar e transformar dados
-- Práticas de engenharia de dados como idempotência e incrementalidade
-- Preparação para escalabilidade e integração com BI
+### Connect as admin (bootstrap only)
 
----
-
-## Estado do Projeto (Sprint Fechado)
-
-- Pipeline de extração e carga raw implementado
-- Materialized views analíticas criadas e otimizadas
-- Ambiente local com Docker configurado e funcional
-- Testes de qualidade e integração completos e aprovados
-
----
-
-## Próximos Passos (Fora do Sprint)
-
-- Integração com API real do PrestaShop para dados em tempo real
-- Implementação de cargas incrementais com watermarks
-- Enriquecimento com estados de encomenda (paid, shipped, refunded)
-- Exportação e integração com Data Warehouse externo (Snowflake, BigQuery)
-
-# PHC Analytics — Production‑Ready Analytics Engineering Project
-
-## Executive Summary
-PHC Analytics is a **hands‑on, production‑oriented Data Engineering / Analytics Engineering project** designed to demonstrate how modern analytics systems are **designed, bootstrapped, operated, and validated** in real environments.
-
-This is **not a tutorial project**.
-It focuses on:
-- real architectural decisions
-- operational correctness
-- reproducibility
-- performance validation
-- clear separation of concerns
-
-The repository is intentionally structured to be **readable and assessable by recruiters, hiring managers, and senior data engineers**.
-
----
-
-## Problem Statement
-Operational systems (OLTP) are not designed for analytics.
-
-This project demonstrates how to:
-- ingest operational data safely
-- preserve source truth
-- transform data into analytics‑ready structures
-- serve analytical workloads efficiently
-- validate performance and correctness
-
-All decisions are explicit and defensible from a production perspective.
-
----
-
-## High‑Level Architecture
-
+```bash
+psql "postgresql://phcadmin:<PASSWORD>@<SERVER>.postgres.database.azure.com/phc_analytics?sslmode=require"
 ```
-PrestaShop (OLTP)
-        ↓
-PostgreSQL — Raw Layer (JSONB)
-        ↓
-PostgreSQL — Analytics Layer
-        ↓
-Materialized Views (BI / Analytics consumption)
+
+### Connect as ETL user (day-to-day operations)
+
+```bash
+psql "postgresql://etl_user:<PASSWORD>@<SERVER>.postgres.database.azure.com/phc_analytics?sslmode=require"
+```
+
+### Verify schema privileges
+
+```sql
+SELECT n.nspname,
+       has_schema_privilege(current_user, n.oid, 'USAGE')  AS can_usage,
+       has_schema_privilege(current_user, n.oid, 'CREATE') AS can_create
+FROM pg_namespace n
+WHERE n.nspname IN ('raw','staging','analytics')
+ORDER BY 1;
 ```
 
 ---
 
-## Layered Design
+## Key Engineering Practices Demonstrated
 
-### 1. Source / OLTP Layer
-Operational data originating from **PrestaShop** (customers, orders).
-
-Characteristics:
-- mutable data
-- business‑driven schemas
-- not optimized for analytics
-
----
-
-### 2. Raw Layer (PostgreSQL)
-Raw ingestion layer storing source payloads as JSONB.
-
-Key properties:
-- schema‑agnostic ingestion
-- idempotent upserts
-- replayable pipelines
-- no business logic
-
-Purpose:
-> Preserve source truth and decouple ingestion from analytics.
+- Layered warehouse design (raw/staging/analytics)
+- JSONB raw ingestion for source-truth preservation
+- Idempotent ingestion with deterministic upserts
+- Incremental processing via explicit state table
+- Least-privilege database roles for pipelines
+- Reproducible local + cloud-ready execution
 
 ---
 
-### 3. Analytics Layer (PostgreSQL)
-Analytics‑oriented relational structures built explicitly for analytical workloads.
+## Next Steps
 
-Includes:
-- analytical tables
-- derived metrics
-- dimensional‑style structures
-- analytical views
-- **materialized views**
-
-Purpose:
-> Serve fast, predictable, and scalable analytical queries.
-
----
-
-## Bootstrap & Reproducibility
-
-### SQL‑First Analytics Bootstrap
-The entire analytics system can be created from scratch using **versioned SQL migrations**.
-
-Main migration:
-```
-sql/migrations/001_init_analytics.sql
-```
-
-This migration:
-- creates schemas (`raw`, `analytics`)
-- defines analytics tables
-- creates analytical views
-- creates materialized views
-- applies performance indexes
-- prepares refresh logging
-
-This mirrors **real production database lifecycle management**.
-
----
-
-## Materialized Views Strategy
-
-### Why Materialized Views
-- expensive joins pre‑computed
-- predictable query latency
-- BI‑friendly access patterns
-- isolation from OLTP workloads
-
-### Performance Validation
-Queries are validated using:
-- `EXPLAIN ANALYZE`
-- buffer usage inspection
-- index usage confirmation
-
-Example:
-- top‑N queries ordered by ingestion time
-- index‑backed access paths
-- sub‑millisecond execution times at 10k+ rows
-
----
-
-## Refresh Control & Observability
-
-Materialized views are refreshed explicitly and logged.
-
-Features:
-- controlled refresh execution
-- optional concurrent refresh
-- refresh timestamp logging
-- operational visibility
-
-This reflects how analytics systems are operated in production, not ad‑hoc querying.
-
----
-
-## Data Volume Simulation
-To validate performance characteristics, the project simulates:
-- 10,000+ orders
-- repeated refresh cycles
-- index efficiency under load
-
-This ensures decisions scale beyond toy datasets.
-
----
-
-## Technology Stack
-
-- **PostgreSQL** — analytical engine
-- **SQL** — transformations and modeling
-- **JSONB** — raw data preservation
-- **Materialized Views** — analytics acceleration
-- **Docker Compose** — reproducible local environment
-
-The stack is intentionally **simple, explicit, and production‑realistic**.
-
----
-
-## What This Project Demonstrates to the Market
-
-### Core Data Engineering Skills
-- OLTP vs Analytics separation
-- idempotent ingestion patterns
-- reproducible schema management
-- analytical modeling
-- performance tuning
-- refresh orchestration
-
-### Analytics Engineering Practices
-- analytics‑first schema design
-- materialized view strategy
-- BI‑ready datasets
-- predictable query performance
-
-### Production Mindset
-- no hidden magic
-- explicit decisions
-- observable behavior
-- controlled execution paths
-
----
-
-## Current Status
-**Sprint 3 — Production‑Ready Analytics Layer: COMPLETED**
-
-- Raw ingestion tables implemented
-- Analytics tables defined
-- Analytical views created
-- Materialized views operational
-- Indexing applied and validated
-- Refresh logic implemented and logged
-- Performance validated with real volume
-
----
-
-## Next Planned Evolutions (Out of Sprint)
-- Cloud deployment (Azure / Snowflake / BigQuery)
-- dbt‑based transformations
-- Orchestration (Prefect / Airflow)
-- Incremental models with watermarks
-- Data quality checks
-- BI integration
-
-These steps align the project with **enterprise‑grade analytics platforms**.
+- Automate per-entity watermark updates
+- Add data quality checks (nulls, duplicates, schema drift)
+- Build analytics-layer dimensions and facts
+- Introduce orchestration (Airflow / Prefect)
+- BI integration (Power BI / Metabase)
+- Cost/performance tuning on Azure
 
 ---
 
 ## Target Roles
-This project is intentionally aligned with:
+
 - Data Engineer
 - Analytics Engineer
-- Senior Analytics Engineer
-- Modern BI / Analytics Platform roles
-- Remote / Hybrid Data Engineering positions
-
----
-
-## Final Note
-PHC Analytics reflects **how data systems are actually built and operated**, not how they are presented in tutorials.
-
-Clean, explicit, reproducible, and defensible.
-
-That is the point of this project.
+- Modern BI / Analytics Platform Engineer
