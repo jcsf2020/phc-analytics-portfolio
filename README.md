@@ -159,3 +159,11 @@ ORDER BY 1;
 - Data Engineer
 - Analytics Engineer
 - Modern BI / Analytics Platform Engineer
+
+### Sprint 5 — Incremental Raw Ingestion (COMPLETED)
+
+- Python pipeline for raw ingestion (PrestaShop → PostgreSQL)
+- JSONB source-of-truth tables with deterministic upserts
+- Entity-level incremental control via `staging.etl_watermarks`
+- Idempotent ingestion validated against Azure PostgreSQL
+- Production-safe SQL patterns (`ON CONFLICT DO UPDATE`)
