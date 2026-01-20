@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 
 from src.phc_analytics.integrations.odoo.client import OdooClient, build_local_client
-from src.phc_analytics.integrations.prestashop.client import PrestaShopClient, PrestaShopConfig
+from src.phc_analytics.integrations.prestashop.client import PrestaShopClient
 
 
 def _build_prestashop_client() -> PrestaShopClient:
@@ -36,7 +36,9 @@ def _ensure_custom_fields_exist_admin_only() -> None:
     return
 
 
-def upsert_customers(odoo: OdooClient, customers: List[Dict[str, Any]]) -> Dict[str, int]:
+def upsert_customers(
+    odoo: OdooClient, customers: List[Dict[str, Any]]
+) -> Dict[str, int]:
     created = 0
     updated = 0
 
@@ -137,7 +139,9 @@ def upsert_products(odoo: OdooClient, products: List[Dict[str, Any]]) -> Dict[st
     return {"created": created, "updated": updated}
 
 
-def _get_product_variant_id_by_ps_product_id(odoo: OdooClient, ps_product_id: int) -> int:
+def _get_product_variant_id_by_ps_product_id(
+    odoo: OdooClient, ps_product_id: int
+) -> int:
     """
     Odoo: sale.order.line espera product_id (product.product), não product.template.
     Estratégia:
@@ -151,11 +155,15 @@ def _get_product_variant_id_by_ps_product_id(odoo: OdooClient, ps_product_id: in
         limit=1,
     )
     if not rows:
-        raise RuntimeError(f"Product not found in Odoo for prestashop_product_id={ps_product_id}")
+        raise RuntimeError(
+            f"Product not found in Odoo for prestashop_product_id={ps_product_id}"
+        )
 
     pv = rows[0].get("product_variant_id")
     if not pv or not isinstance(pv, list) or not pv[0]:
-        raise RuntimeError(f"Missing product_variant_id for product.template id={rows[0]['id']}")
+        raise RuntimeError(
+            f"Missing product_variant_id for product.template id={rows[0]['id']}"
+        )
     return int(pv[0])
 
 
@@ -167,7 +175,9 @@ def _find_partner_id_by_ps_customer_id(odoo: OdooClient, ps_customer_id: int) ->
         limit=1,
     )
     if not rows:
-        raise RuntimeError(f"Customer not found in Odoo for prestashop_customer_id={ps_customer_id}")
+        raise RuntimeError(
+            f"Customer not found in Odoo for prestashop_customer_id={ps_customer_id}"
+        )
     return int(rows[0]["id"])
 
 
@@ -272,8 +282,12 @@ def run(use_mock: bool = True) -> Dict[str, Any]:
         raw_products = prestashop.get_products()
         raw_orders = prestashop.get_orders()
 
-    customers = raw_customers.get("customers", []) if isinstance(raw_customers, dict) else []
-    products = raw_products.get("products", []) if isinstance(raw_products, dict) else []
+    customers = (
+        raw_customers.get("customers", []) if isinstance(raw_customers, dict) else []
+    )
+    products = (
+        raw_products.get("products", []) if isinstance(raw_products, dict) else []
+    )
     orders = raw_orders.get("orders", []) if isinstance(raw_orders, dict) else []
 
     r1 = upsert_customers(odoo, customers)
