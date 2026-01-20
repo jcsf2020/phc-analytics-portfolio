@@ -75,6 +75,47 @@ Delivered in Azure:
   - JSONB payload
   - Idempotent upserts using `ON CONFLICT DO UPDATE`
 
+### Sprint 5 — Incremental Raw Ingestion (COMPLETED)
+
+- Python pipeline for raw ingestion (PrestaShop → PostgreSQL)
+- JSONB source-of-truth tables with deterministic upserts
+- Entity-level incremental control via `staging.etl_watermarks`
+- Idempotent ingestion validated against Azure PostgreSQL
+- Production-safe SQL patterns (`ON CONFLICT DO UPDATE`)
+
+### Sprint 6 — SQL Latest-State Snapshot (raw → staging) (COMPLETED)
+
+Delivered in Azure PostgreSQL:
+
+- Implemented as a VIEW (not a table) to guarantee zero-lag freshness and avoid recomputation orchestration.
+- Created a **staging latest-state view** using window functions (`ROW_NUMBER()` + `PARTITION BY` + `ORDER BY DESC`).
+- Implemented `staging.prestashop_orders_latest` as a **VIEW** (not a table) for an always-up-to-date snapshot.
+- Validated correctness with invariant checks:
+  - `latest_rows == COUNT(DISTINCT order_id)`
+- Demonstrated JSONB field extraction for inspection:
+  - `payload->>'field'`
+
+SQL pattern used:
+
+```sql
+CREATE VIEW staging.<entity>_latest AS
+SELECT *
+FROM (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (
+      PARTITION BY <entity_id>
+      ORDER BY <updated_at> DESC
+    ) AS rn
+  FROM raw.<source_table>
+) t
+WHERE rn = 1;
+```
+
+Notes:
+
+- `raw.prestashop_customers` and `raw.prestashop_products` tables are provisioned; latest-state views can be created once data is ingested.
+
 ---
 
 ## Repository Structure (high level)
@@ -147,6 +188,7 @@ ORDER BY 1;
 
 - Automate per-entity watermark updates
 - Add data quality checks (nulls, duplicates, schema drift)
+- Expand latest-state views to customers/products and introduce basic staging quality checks (row-count invariants, null checks).
 - Build analytics-layer dimensions and facts
 - Introduce orchestration (Airflow / Prefect)
 - BI integration (Power BI / Metabase)
@@ -159,11 +201,3 @@ ORDER BY 1;
 - Data Engineer
 - Analytics Engineer
 - Modern BI / Analytics Platform Engineer
-
-### Sprint 5 — Incremental Raw Ingestion (COMPLETED)
-
-- Python pipeline for raw ingestion (PrestaShop → PostgreSQL)
-- JSONB source-of-truth tables with deterministic upserts
-- Entity-level incremental control via `staging.etl_watermarks`
-- Idempotent ingestion validated against Azure PostgreSQL
-- Production-safe SQL patterns (`ON CONFLICT DO UPDATE`)
