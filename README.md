@@ -184,6 +184,30 @@ ORDER BY 1;
 
 ---
 
+### Sprint 7 — Analytics Time Dimension (COMPLETED)
+
+Delivered in PostgreSQL (analytics layer):
+
+- Designed and implemented a production-grade Time Dimension (`analytics.dim_date`)
+- Built from a minimal staging source (`staging.dim_date`)
+- Enriched with analytics-ready attributes:
+  - `quarter`
+  - `year_month`
+  - `year_quarter`
+  - `month_start`, `month_end`
+  - `is_month_start`, `is_month_end`
+  - `day_of_week`, `day_name`
+  - `is_weekend`
+- Implemented as a VIEW for transparency and zero-lag freshness
+- Validated data completeness and correctness:
+  - Date range coverage: 2020-01-01 → 2030-12-31
+  - Row count and distinct date invariants
+  - Month start/end consistency checks
+- Granted read-only access to ETL role (`etl_user`) following least-privilege principles
+
+Outcome:
+A reusable, analytics-ready Time Dimension suitable for BI tools, KPI aggregation, and fact-table joins.
+
 ## Next Steps
 
 - Automate per-entity watermark updates
