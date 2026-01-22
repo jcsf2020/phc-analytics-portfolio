@@ -28,3 +28,4 @@ out_test/
 .ipynb_checkpoints/
 # Runtime logs
 logs/
+phc_analytics_azure.session.sql

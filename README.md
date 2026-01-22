@@ -205,8 +205,34 @@ Delivered in PostgreSQL (analytics layer):
   - Month start/end consistency checks
 - Granted read-only access to ETL role (`etl_user`) following least-privilege principles
 
+### Sprint 8 — Staging Orders Cleansing & Analytics Integrity (COMPLETED)
+
+Delivered in PostgreSQL (raw → staging):
+
+- Inserted large-scale mock data (~5,000 orders) to simulate realistic analytics volumes.
+- Validated raw ingestion correctness using row-count and payload inspections.
+- Built `staging.orders_clean` as a curated, analytics-safe representation of orders.
+- Extracted and normalized key attributes (order_date) from JSONB payloads.
+- Enforced referential integrity against the Time Dimension (`analytics.dim_date`).
+- Performed systematic integrity checks:
+  - total orders vs matched dates
+  - detection of orphan / NULL dates via LEFT JOIN analysis
+- Identified and removed a known manual test record (`test_order_1`) that violated the data contract.
+- Restored full integrity:
+  - orders = matched_dates
+  - missing_dates = 0
+
+Key engineering concepts demonstrated:
+
+- Data Quality validation (null detection, referential integrity)
+- Root-cause analysis of data inconsistencies
+- Conscious decision-making: exclude known test noise vs corrupt production data
+- Analytics-focused staging design (clean, join-safe datasets)
+- Manual validation patterns commonly used in real-world production debugging
+
 Outcome:
-A reusable, analytics-ready Time Dimension suitable for BI tools, KPI aggregation, and fact-table joins.
+A clean, high-volume, analytics-ready staging orders dataset suitable for KPI aggregation,
+fact-table modeling, and BI consumption.
 
 ## Next Steps
 
