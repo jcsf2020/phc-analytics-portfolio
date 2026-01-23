@@ -234,12 +234,38 @@ Outcome:
 A clean, high-volume, analytics-ready staging orders dataset suitable for KPI aggregation,
 fact-table modeling, and BI consumption.
 
+### Sprint 9 — Analytics Fact Orders + Daily Revenue View (COMPLETED)
+
+Delivered in PostgreSQL (staging → analytics):
+
+- Confirmed working database connections in VS Code SQLTools for both roles:
+  - `PHC_Analytics_Admin` (admin / bootstrap)
+  - `PHC_Analytics_Azure` (ETL day-to-day)
+- Inspected `raw.prestashop_orders` structure and payload keys to define a stable analytics contract.
+- Promoted typed, analytics-safe orders into the analytics layer:
+  - Created `analytics.fact_orders` from `staging.prestashop_orders`
+  - Casted critical fields to correct types:
+    - `order_id`, `customer_id`, `order_state`, `source` → `text`
+    - `order_date` → `timestamp`
+    - `total_paid` → `numeric`
+- Ran integrity and sanity checks:
+  - Row-count parity checks (staging vs analytics)
+  - Duplicate detection on `order_id` (GROUP BY + HAVING COUNT(*) > 1)
+  - Min/max date window checks
+- Implemented a KPI-ready daily aggregation view:
+  - Created `analytics.v_daily_revenue` (orders + revenue by day)
+
+Outcome:
+A minimal but production-style analytics foundation (fact table + reusable KPI view) suitable for BI dashboards and daily revenue tracking.
+
 ## Next Steps
 
 - Automate per-entity watermark updates
 - Add data quality checks (nulls, duplicates, schema drift)
-- Expand latest-state views to customers/products and introduce basic staging quality checks (row-count invariants, null checks).
-- Build analytics-layer dimensions and facts
+- Expand latest-state views to customers/products and introduce basic staging quality checks (row-count invariants, null checks)
+- Add additional facts and dimensions:
+  - `fact_order_items` (requires order lines)
+  - `dim_customer` and `dim_product`
 - Introduce orchestration (Airflow / Prefect)
 - BI integration (Power BI / Metabase)
 - Cost/performance tuning on Azure
