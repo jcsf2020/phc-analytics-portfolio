@@ -258,6 +258,32 @@ Delivered in PostgreSQL (staging → analytics):
 Outcome:
 A minimal but production-style analytics foundation (fact table + reusable KPI view) suitable for BI dashboards and daily revenue tracking.
 
+### Sprint 10 — Semantic Metric Layer (KPI Catalog + Governed Views) (COMPLETED)
+
+Delivered in PostgreSQL (analytics layer):
+
+- Created an explicit semantic layer between physical models (facts/dimensions) and business metrics:
+  - Physical layer: `analytics.fact_orders`, `analytics.dim_date`
+  - Semantic/metric layer: governed KPI views + KPI catalog table
+- Implemented a KPI catalog to document and govern metric definitions:
+  - Created `analytics.kpi_definitions` with:
+    - `kpi_name` (PK), `description`, `formula`, `grain`, `notes`
+  - Inserted the first KPI definition: `daily_revenue`
+- Implemented a governed KPI view as the metric source of truth:
+  - Created `analytics.v_kpi_daily_revenue` (orders + revenue by day)
+  - Joined `analytics.fact_orders` to `analytics.dim_date` using:
+    - `dim_date.date_id = DATE(fact_orders.order_date)`
+  - Output contract:
+    - `date_day`, `total_orders`, `revenue`
+- Hardened role-based access for real-world workflows:
+  - Clarified DDL vs DML responsibilities:
+    - Admin role (`phcadmin`) performs bootstrap DDL
+    - ETL role (`etl_user`) runs day-to-day reads/writes and (when explicitly granted) scoped DDL
+  - Granted `CREATE` on schema `analytics` to `etl_user` to allow controlled creation of metric objects.
+
+Outcome:
+A metric layer demonstrating semantic governance: documented KPIs + governed views as a single source of truth for BI and business reporting.
+
 ## Next Steps
 
 - Automate per-entity watermark updates
