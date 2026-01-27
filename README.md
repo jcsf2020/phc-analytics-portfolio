@@ -69,6 +69,27 @@ This project was developed iteratively using a sprint-based approach.
 - **Sprint 11 — Packaging & Integrations**
   Repository cleanup and isolated ERP integration (Odoo addon).
 
+- **Sprint 12 — Data Quality & Historical Modeling (SCD Type 2)**
+  Design and implementation of a Slowly Changing Dimension (Type 2) for customers,
+  with a strong focus on data quality and temporal correctness.
+
+  Key outcomes:
+  - Clear grain definition: one row per customer per version
+  - Natural key vs surrogate key separation (`customer_nk` / `customer_sk`)
+  - Validity window modeling using `valid_from` / `valid_to`
+  - Current record flag (`is_current`) with enforced consistency
+  - Database-level data quality guardrails:
+    - CHECK constraints for temporal validity
+    - CHECK constraint for current flag correctness
+    - Partial unique index ensuring one current record per natural key
+  - Analytical validation queries:
+    - current vs historical counts
+    - distinct customer checks
+    - temporal overlap detection (no overlapping validity ranges)
+
+  This sprint emphasizes engineering discipline and correctness-first modeling,
+  aligning with enterprise data warehousing best practices and interview expectations.
+
 ---
 
 ## Repository Structure (high level)
