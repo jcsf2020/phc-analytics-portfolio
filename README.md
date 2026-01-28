@@ -98,7 +98,8 @@ This project was developed iteratively using a sprint-based approach.
   as first-class analytical assets.
 
   Key outcomes:
-  - Structured data quality layout under `sql/analytics/data_quality/`
+  - Structured data quality layout under `sql/analytics/data_quality/` (canonical)
+  - Legacy single-file checks may exist for reference (e.g., `sql/analytics/data_quality_dim_customer.sql`)
   - Dimension-scoped checks (starting with `dim_customer`)
   - Clear execution contract: checks must return **0 rows** to be considered valid
   - SCD Type 2 integrity validation:
@@ -110,6 +111,37 @@ This project was developed iteratively using a sprint-based approach.
 
   This sprint reinforces production-grade data governance practices and
   mirrors how data quality is validated in mature analytics platforms.
+
+- **Sprint 14 — Data Quality Contract + Execution Discipline**
+  Formalize data quality as a contract and define a repeatable execution routine
+  that can scale across dimensions and marts.
+
+  Key outcomes:
+  - Explicit "0 rows" contract for every check query
+  - Standard folder + naming convention: `sql/analytics/data_quality/<asset>/` and
+    `01_`, `02_`, ... prefixes
+  - Repeatable execution pattern (psql), suitable for automation later
+
+  Contract spec: see `docs/data_quality_contract.md`.
+
+  Run checks (example):
+
+  ```bash
+  psql "$DATABASE_URL" \
+    -v ON_ERROR_STOP=1 \
+    -f sql/analytics/data_quality/dim_customer/01_scd2_integrity.sql
+  ```
+
+  Run all checks in a folder (repeatable runner script):
+
+  ```bash
+  scripts/run_dq_folder.sh sql/analytics/data_quality/dim_customer
+  ```
+
+  Notes:
+  - Requires `DATABASE_URL` to be set.
+  - Runs `*.sql` files in sorted order (`01_`, `02_`, ...).
+  - Checks are valid when every query returns **0 rows**.
 
 ---
 
