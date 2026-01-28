@@ -4,6 +4,10 @@ set -euo pipefail
 # Usage:
 #   scripts/run_dq_folder.sh sql/analytics/data_quality/dim_customer
 #
+# Contract:
+#   - Every check query MUST return 0 rows to be valid.
+#   - If any check returns >= 1 row, this script exits 1 (quality gate fail).
+#
 # Requires:
 #   DATABASE_URL set in env.
 
@@ -34,9 +38,32 @@ if [[ ${#FILES[@]} -eq 0 ]]; then
 fi
 
 echo "Running data quality checks in: $FOLDER"
+
+failed=0
+
 for f in "${FILES[@]}"; do
   echo "==> $f"
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+
+  # psql flags:
+  # -q : quiet (less noise)
+  # -A : unaligned output (machine-friendly)
+  # -t : tuples only (no headers)
+  # -v ON_ERROR_STOP=1 : stop on SQL error (non-zero exit)
+  out="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qAt -f "$f" || true)"
+
+  if [[ -n "$out" ]]; then
+    echo "FAIL: check returned rows in $f"
+    echo "$out"
+    failed=1
+  else
+    echo "PASS: 0 rows"
+  fi
 done
 
-echo "OK: all checks executed"
+if [[ "$failed" -ne 0 ]]; then
+  echo "DQ GATE: FAILED"
+  exit 1
+fi
+
+echo "DQ GATE: PASSED"
+exit 0

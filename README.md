@@ -143,6 +143,27 @@ This project was developed iteratively using a sprint-based approach.
   - Runs `*.sql` files in sorted order (`01_`, `02_`, ...).
   - Checks are valid when every query returns **0 rows**.
 
+## Data Quality as a First-Class Citizen
+
+In this project, data quality is treated as an explicit, versioned engineering
+concern — not as an ad-hoc validation step or a downstream dashboard check.
+
+Key design principles:
+
+- **Contract-first**: every data quality rule is documented and versioned
+  (`docs/data_quality_contract.md`).
+- **Deterministic checks**: each SQL check must return **0 rows** to be valid.
+- **Read-only by design**: checks never mutate data and can be executed safely
+  at any point in time.
+- **Execution discipline**: a single, generic runner script executes checks in
+  a predictable order and fails fast on error.
+- **Automation-ready**: the same execution pattern can be reused in CI/CD,
+  scheduled jobs, or deployment quality gates without modification.
+
+This mirrors how mature analytics platforms operationalize data quality:
+explicit contracts, deterministic validation, and repeatable execution —
+separating correctness concerns from transformation logic.
+
 ---
 
 ## Repository Structure (high level)
