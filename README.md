@@ -7,7 +7,9 @@ Portfolio deliverable of a data engineering / analytics project focused on:
 - clear repository structure and delivery discipline
 - real-world system integration examples (ERP)
 
-> Note: This repo is designed as a portfolio-friendly deliverable. It intentionally avoids committing local/editor artifacts and binary release files.
+> Note: This repo is designed as a portfolio-friendly deliverable.
+> It intentionally avoids committing local/editor artifacts
+> and binary release files.
 
 ## Tech Stack
 
@@ -88,7 +90,26 @@ This project was developed iteratively using a sprint-based approach.
     - temporal overlap detection (no overlapping validity ranges)
 
   This sprint emphasizes engineering discipline and correctness-first modeling,
-  aligning with enterprise data warehousing best practices and interview expectations.
+  aligning with enterprise data warehousing best practices and interview
+  expectations.
+
+- **Sprint 13 — Data Quality Validation Framework**
+  Consolidation and operationalization of data quality checks
+  as first-class analytical assets.
+
+  Key outcomes:
+  - Structured data quality layout under `sql/analytics/data_quality/`
+  - Dimension-scoped checks (starting with `dim_customer`)
+  - Clear execution contract: checks must return **0 rows** to be considered valid
+  - SCD Type 2 integrity validation:
+    - no overlapping validity ranges
+    - exactly one current record per natural key
+    - valid temporal windows (`valid_from` / `valid_to`)
+  - Re-runnable, read-only analytical checks (no side effects)
+  - Naming convention to support scaling (`01_`, `02_`, ...)
+
+  This sprint reinforces production-grade data governance practices and
+  mirrors how data quality is validated in mature analytics platforms.
 
 ---
 
@@ -125,7 +146,9 @@ Location in repository:
 This integration is not required to run the analytics pipeline itself;
 it exists to showcase real-world platform integration and delivery discipline.
 
-Why this matters (market signal): it demonstrates boundary management (core vs integrations), reproducibility, and clean delivery practices — common expectations in modern data/platform engineering teams.
+Why this matters (market signal): it demonstrates boundary management (core vs
+integrations), reproducibility, and clean delivery practices — common
+expectations in modern data/platform engineering teams.
 
 ---
 
