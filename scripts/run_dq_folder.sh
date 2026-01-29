@@ -44,12 +44,13 @@ failed=0
 for f in "${FILES[@]}"; do
   echo "==> $f"
 
-  # psql flags:
-  # -q : quiet (less noise)
-  # -A : unaligned output (machine-friendly)
-  # -t : tuples only (no headers)
-  # -v ON_ERROR_STOP=1 : stop on SQL error (non-zero exit)
-  out="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qAt -f "$f" || true)"
+  # Run the check. Any SQL error must FAIL the gate.
+  if ! out="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qAt -f "$f" 2>&1)"; then
+    echo "FAIL: SQL error while executing $f"
+    echo "$out"
+    failed=1
+    continue
+  fi
 
   if [[ -n "$out" ]]; then
     echo "FAIL: check returned rows in $f"
