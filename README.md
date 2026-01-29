@@ -186,14 +186,18 @@ Data quality checks are enforced automatically in CI using **GitHub Actions**.
 
 On every push to `main` and on every pull request, the workflow:
 
-- installs a PostgreSQL client
-- injects a secure `DATABASE_URL` from repository secrets
+- starts an ephemeral PostgreSQL service (Docker-based)
+- waits for database readiness
+- seeds a minimal analytics schema and sample data (`sql/ci/seed_dq_db.sql`)
 - executes the data quality runner script
 - **fails the build if any check returns rows or errors**
 
-Note on safety: `DATABASE_URL` should point to a read-only / analytical
-replica. The intent is to validate analytical correctness without risking
-writes or impacting transactional workloads.
+Note on design: CI does not connect to external cloud databases.
+Instead, it uses an ephemeral local PostgreSQL service to guarantee:
+
+- determinism
+- reproducibility
+- zero dependency on network access or secrets availability
 
 This turns data quality into a **hard quality gate**: code cannot be merged
 unless analytical correctness is preserved.
@@ -210,15 +214,28 @@ scripts/run_dq_folder.sh sql/analytics/data_quality/dim_customer
 
 Requirements:
 
-- A repository secret named `DATABASE_URL` must be configured
-  (`Settings → Secrets and variables → Actions`).
-- The connection must point to a read-only or analytical database replica.
+- No external database access is required for CI
+- All data quality rules must be compatible with the seeded analytics schema
+- CI must fail fast on any SQL error or non‑zero result set
 
 Why this matters (market signal):
 
 - demonstrates CI/CD ownership beyond transformations
 - shows contract-based data quality enforcement
 - mirrors production analytics platforms where correctness blocks deployment
+
+### Local vs CI execution model
+
+- **Local execution**:
+  - Uses a real analytics database (e.g. Azure PostgreSQL)
+  - Intended for validating data against realistic volumes and states
+  - Requires `DATABASE_URL` to be set by the developer
+
+- **CI execution**:
+  - Uses an ephemeral PostgreSQL instance
+  - Schema and sample data are seeded deterministically
+  - Ensures rules are syntactically valid, logically correct and reproducible
+  - Acts as a hard merge gate
 
 ## What This Repo Proves
 
