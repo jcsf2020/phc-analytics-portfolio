@@ -72,8 +72,8 @@ This project was developed iteratively using a sprint-based approach.
   Repository cleanup and isolated ERP integration (Odoo addon).
 
 - **Sprint 12 — Data Quality & Historical Modeling (SCD Type 2)**
-  Design and implementation of a Slowly Changing Dimension (Type 2) for customers,
-  with a strong focus on data quality and temporal correctness.
+  Design and implementation of a Slowly Changing Dimension (Type 2) for
+  customers, with a strong focus on data quality and temporal correctness.
 
   Key outcomes:
   - Clear grain definition: one row per customer per version
@@ -99,9 +99,11 @@ This project was developed iteratively using a sprint-based approach.
 
   Key outcomes:
   - Structured data quality layout under `sql/analytics/data_quality/` (canonical)
-  - Legacy single-file checks may exist for reference (e.g., `sql/analytics/data_quality_dim_customer.sql`)
+  - Legacy single-file checks may exist for reference
+    (e.g., `sql/analytics/data_quality_dim_customer.sql`)
   - Dimension-scoped checks (starting with `dim_customer`)
-  - Clear execution contract: checks must return **0 rows** to be considered valid
+  - Clear execution contract: checks must return **0 rows** to be considered
+    valid
   - SCD Type 2 integrity validation:
     - no overlapping validity ranges
     - exactly one current record per natural key
@@ -113,13 +115,13 @@ This project was developed iteratively using a sprint-based approach.
   mirrors how data quality is validated in mature analytics platforms.
 
 - **Sprint 14 — Data Quality Contract + Execution Discipline**
-  Formalize data quality as a contract and define a repeatable execution routine
-  that can scale across dimensions and marts.
+  Formalize data quality as a contract and define a repeatable execution
+  routine that can scale across dimensions and marts.
 
   Key outcomes:
   - Explicit "0 rows" contract for every check query
-  - Standard folder + naming convention: `sql/analytics/data_quality/<asset>/` and
-    `01_`, `02_`, ... prefixes
+  - Standard folder + naming convention: `sql/analytics/data_quality/<asset>/`
+    and `01_`, `02_`, ... prefixes
   - Repeatable execution pattern (psql), suitable for automation later
 
   Contract spec: see `docs/data_quality_contract.md`.
@@ -164,6 +166,20 @@ This mirrors how mature analytics platforms operationalize data quality:
 explicit contracts, deterministic validation, and repeatable execution —
 separating correctness concerns from transformation logic.
 
+## Production Checklist
+
+Before treating this repository as a production-grade pattern, ensure the
+following are true:
+
+- A **read-only** or **analytics replica** connection string is available for
+  automated validation (never point CI to a primary OLTP database).
+- A repository secret named `DATABASE_URL` is configured for CI runs.
+- Network access from GitHub Actions to the database is allowed (firewall / IP
+  rules / private endpoints as applicable).
+- Data quality checks are treated as a **blocking gate** for merges and deploys.
+- Optional but recommended: schedule the same checks (cron) and alert on
+  failures.
+
 ## CI / Data Quality Gate (GitHub Actions)
 
 Data quality checks are enforced automatically in CI using **GitHub Actions**.
@@ -174,6 +190,10 @@ On every push to `main` and on every pull request, the workflow:
 - injects a secure `DATABASE_URL` from repository secrets
 - executes the data quality runner script
 - **fails the build if any check returns rows or errors**
+
+Note on safety: `DATABASE_URL` should point to a read-only / analytical
+replica. The intent is to validate analytical correctness without risking
+writes or impacting transactional workloads.
 
 This turns data quality into a **hard quality gate**: code cannot be merged
 unless analytical correctness is preserved.
@@ -199,6 +219,20 @@ Why this matters (market signal):
 - demonstrates CI/CD ownership beyond transformations
 - shows contract-based data quality enforcement
 - mirrors production analytics platforms where correctness blocks deployment
+
+## What This Repo Proves
+
+- I model dimensions with correctness-first discipline (including SCD Type 2).
+- I treat data quality as a **versioned contract**, not an ad-hoc checklist.
+- I operationalize validation with a repeatable runner and a CI quality gate.
+- I document decisions clearly and keep the repo portfolio-friendly.
+
+## What I'd Do Next (Given Time)
+
+- Add more checks per asset (`02_`, `03_`, ...) and expand coverage to marts.
+- Run checks against a dedicated replica and add alerting on failures.
+- Introduce environment profiles (local vs CI) and a small makefile/runbook.
+- Add lightweight reporting of check results (counts, timing) for observability.
 
 ---
 
