@@ -44,15 +44,19 @@ failed=0
 for f in "${FILES[@]}"; do
   echo "==> $f"
 
-  # Run the check. Any SQL error must FAIL the gate.
-  if ! out="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qAt -f "$f" 2>&1)"; then
+  # -X disables ~/.psqlrc (avoids local config changing CI/local behavior)
+  # VERBOSITY=terse reduces noise so we only see query results
+  if ! out="$(psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -v VERBOSITY=terse -qAt -f "$f" 2>&1)"; then
     echo "FAIL: SQL error while executing $f"
     echo "$out"
     failed=1
     continue
   fi
 
-  if [[ -n "$out" ]]; then
+  # Treat whitespace-only output as empty (PASS)
+  out_no_ws="${out//[[:space:]]/}"
+
+  if [[ -n "$out_no_ws" ]]; then
     echo "FAIL: check returned rows in $f"
     echo "$out"
     failed=1

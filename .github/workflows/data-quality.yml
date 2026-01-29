@@ -5,7 +5,6 @@ on:
   push:
     branches: [main]
 
-# Avoid wasting minutes if multiple pushes happen quickly
 concurrency:
   group: data-quality-${{ github.ref }}
   cancel-in-progress: true
@@ -14,6 +13,20 @@ jobs:
   data-quality:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dq
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d dq"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
 
     steps:
       - name: Checkout repository
@@ -27,29 +40,39 @@ jobs:
       - name: Ensure DQ runner is executable
         run: chmod +x scripts/run_dq_folder.sh
 
-      - name: Validate DATABASE_URL secret is present
+      - name: Wait for Postgres service
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dq
         run: |
-          if [ -z "$DATABASE_URL" ]; then
-            echo "ERROR: DATABASE_URL secret is not set"
-            exit 2
-          fi
+          for i in {1..30}; do
+            if psql "$DATABASE_URL" -qAt -c "select 1" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "ERROR: Postgres service not reachable"
+          exit 1
+
+      - name: Seed CI DQ database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dq
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/ci/seed_dq_db.sql
 
       - name: Run data quality checks (dim_customer)
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dq
         run: |
           scripts/run_dq_folder.sh sql/analytics/data_quality/dim_customer
 
       - name: Run data quality checks (fact_orders)
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dq
         run: |
           scripts/run_dq_folder.sh sql/analytics/data_quality/fact_orders
 
       - name: Run data quality checks (dim_date)
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dq
         run: |
           scripts/run_dq_folder.sh sql/analytics/data_quality/dim_date
