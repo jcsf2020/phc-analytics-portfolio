@@ -164,6 +164,42 @@ This mirrors how mature analytics platforms operationalize data quality:
 explicit contracts, deterministic validation, and repeatable execution —
 separating correctness concerns from transformation logic.
 
+## CI / Data Quality Gate (GitHub Actions)
+
+Data quality checks are enforced automatically in CI using **GitHub Actions**.
+
+On every push to `main` and on every pull request, the workflow:
+
+- installs a PostgreSQL client
+- injects a secure `DATABASE_URL` from repository secrets
+- executes the data quality runner script
+- **fails the build if any check returns rows or errors**
+
+This turns data quality into a **hard quality gate**: code cannot be merged
+unless analytical correctness is preserved.
+
+Workflow definition:
+
+- `.github/workflows/data-quality.yml`
+
+Executed command in CI:
+
+```bash
+scripts/run_dq_folder.sh sql/analytics/data_quality/dim_customer
+```
+
+Requirements:
+
+- A repository secret named `DATABASE_URL` must be configured
+  (`Settings → Secrets and variables → Actions`).
+- The connection must point to a read-only or analytical database replica.
+
+Why this matters (market signal):
+
+- demonstrates CI/CD ownership beyond transformations
+- shows contract-based data quality enforcement
+- mirrors production analytics platforms where correctness blocks deployment
+
 ---
 
 ## Repository Structure (high level)
