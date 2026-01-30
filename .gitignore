@@ -41,3 +41,7 @@ PHC_Analytics_Odoo_Release.zip
 
 # Optional: local compose overrides (keep only if you want tracked)
 # docker-compose.odoo.yml
+
+# Local credentials (never commit)
+docs/POSTGRES_AZURE_CREDENTIALS.md
+.vscode/

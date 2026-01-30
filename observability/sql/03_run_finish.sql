@@ -24,11 +24,7 @@ with upd as (
             )::numeric,
             2
         ),
-        rows_processed = case
-            when :'rows_processed' is null
-            or btrim(:'rows_processed') = '' then null
-            else (:'rows_processed')::bigint
-        end,
+        rows_processed = nullif(btrim(:'rows_processed'), '')::bigint,
         error_message = case
             when :'error_message' is null
             or btrim(:'error_message') = '' then null
