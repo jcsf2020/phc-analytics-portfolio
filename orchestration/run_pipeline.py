@@ -35,6 +35,8 @@ from pathlib import Path
 from typing import Optional
 
 
+
+from orchestration.steps.registry import get_steps
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OBS_SQL_DIR = REPO_ROOT / "observability" / "sql"
 
@@ -169,9 +171,14 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
     status = "success"
     error_message = ""
     try:
-        # Sprint 19 will execute steps here.
-        # For now we do nothing and mark success.
-        pass
+        total_rows = 0
+        for step in get_steps():
+            n = step.run(ctx)
+            if n is None:
+                n = 0
+            if n < 0:
+                raise RuntimeError(f"Step {step.name} returned negative rows: {n}")
+            total_rows += int(n)
     except Exception as exc:  # pragma: no cover
         status = "failed"
         error_message = str(exc)[:240]
@@ -180,7 +187,7 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
         finish_vars = {
             "run_id": run_id,
             "status": status,
-            "rows_processed": "" if rows_processed is None else str(rows_processed),
+            "rows_processed": str(total_rows) if rows_processed is None else str(rows_processed),
             "error_message": error_message,
         }
         _run_psql_file(ctx.database_url, SQL_RUN_FINISH, vars=finish_vars, quiet=False)
