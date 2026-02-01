@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from pathlib import Path
 import csv
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, List
 
 from src.phc_analytics.integrations.prestashop.client import PrestaShopClient, PrestaShopConfig
 from src.phc_analytics.transformations.prestashop_normalize import (
