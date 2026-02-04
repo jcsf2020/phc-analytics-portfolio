@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from orchestration.gates.model import GateOutcome, GateResult, GateSeverity
 
