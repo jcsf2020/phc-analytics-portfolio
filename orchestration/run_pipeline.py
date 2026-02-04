@@ -25,19 +25,35 @@ Notes:
 
 from __future__ import annotations
 
+# ruff: noqa: E402
+
+
 import argparse
-import re
 import os
+import re
 import subprocess
 import sys
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-
-
-from orchestration.steps.registry import get_steps
+# Allow running this file directly (python orchestration/run_pipeline.py ...)
+# by ensuring the repository root is on sys.path.
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from orchestration.events.event_types import EventType
+from orchestration.events.writer import EventStreamWriter
+from orchestration.gates.registry import (
+    get_end_run_gates,
+    get_post_step_gates,
+    iter_pre_run_gates,
+)
+from orchestration.gates.runner import run_gate, should_block
+from orchestration.steps.registry import get_steps
+
 OBS_SQL_DIR = REPO_ROOT / "observability" / "sql"
 
 SQL_RUN_START = OBS_SQL_DIR / "02_run_start.sql"
@@ -152,8 +168,51 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
     For now: no steps. This is a scaffold to wire in step execution next.
     """
     if dry_run:
+        # Dry-run should still exercise the runtime wiring (events + gates)
+        # while performing zero database writes.
+        run_id = str(uuid.uuid4())
+        writer = EventStreamWriter(
+            pipeline=ctx.pipeline_name,
+            env=ctx.environment,
+            run_id=run_id,
+        )
+        writer.write(EventType.RUN_STARTED)
+        print(f"run_id={run_id}")
+
+        status = "dry_run"
+        error_message = ""
+        try:
+            # Pre-run gates (fail-fast on BLOCKER)
+            for gate in iter_pre_run_gates():
+                outcome = run_gate(gate=gate, ctx=ctx, writer=writer)
+                if should_block(outcome):
+                    raise RuntimeError(f"Gate {outcome.gate_id} failed (BLOCKER)")
+
+            # We do NOT execute steps in dry-run; we only validate wiring.
+
+        except Exception as exc:  # pragma: no cover
+            status = "failed"
+            error_message = str(exc)[:240]
+        finally:
+            # End-run gates must still execute for diagnostics.
+            try:
+                for gate in get_end_run_gates():
+                    outcome = run_gate(gate=gate, ctx=ctx, writer=writer)
+                    if should_block(outcome):
+                        status = "failed"
+                        if not error_message:
+                            error_message = (
+                                f"Gate {outcome.gate_id} failed (BLOCKER) at end-run"
+                            )
+            except Exception as exc:  # pragma: no cover
+                status = "failed"
+                if not error_message:
+                    error_message = str(exc)[:240]
+
+            writer.write(EventType.RUN_FINISHED, status=status)
+
         print("DRY RUN: skipping database writes")
-        return 0
+        return 0 if status != "failed" else 1
 
     # 1) start run
     start_out = _run_psql_file(
@@ -166,28 +225,80 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
         quiet=False,
     )
     run_id = _extract_run_id(start_out)
+    writer = EventStreamWriter(
+        pipeline=ctx.pipeline_name,
+        env=ctx.environment,
+        run_id=run_id,
+    )
+    writer.write(EventType.RUN_STARTED)
     print(f"run_id={run_id}")
 
     status = "success"
     error_message = ""
+    total_rows = 0
     try:
-        total_rows = 0
+        # 0) pre-run health gates (fail-fast on BLOCKER)
+        for gate in iter_pre_run_gates():
+            outcome = run_gate(gate=gate, ctx=ctx, writer=writer)
+            if should_block(outcome):
+                raise RuntimeError(f"Gate {outcome.gate_id} failed (BLOCKER)")
+
+        # 1) pipeline steps
         for step in get_steps():
-            n = step.run(ctx)
-            if n is None:
-                n = 0
-            if n < 0:
-                raise RuntimeError(f"Step {step.name} returned negative rows: {n}")
-            total_rows += int(n)
+            writer.write(EventType.STEP_STARTED, step_id=step.name)
+            try:
+                n = step.run(ctx)
+                if n is None:
+                    n = 0
+                if n < 0:
+                    raise RuntimeError(f"Step {step.name} returned negative rows: {n}")
+                total_rows += int(n)
+                writer.write(
+                    EventType.STEP_FINISHED,
+                    step_id=step.name,
+                    rows_processed=int(n),
+                )
+                # 2) post-step gates (after step completes; fail-fast on BLOCKER)
+                for gate in get_post_step_gates(step_id=step.name):
+                    outcome = run_gate(gate=gate, ctx=ctx, writer=writer)
+                    if should_block(outcome):
+                        raise RuntimeError(
+                            f"Gate {outcome.gate_id} failed (BLOCKER) after step {step.name}"
+                        )
+            except Exception:
+                writer.write(EventType.STEP_FAILED, step_id=step.name)
+                raise
     except Exception as exc:  # pragma: no cover
         status = "failed"
         error_message = str(exc)[:240]
     finally:
+        # end-run gates must execute even if the run failed (diagnostic + invariants)
+        try:
+            for gate in get_end_run_gates():
+                outcome = run_gate(gate=gate, ctx=ctx, writer=writer)
+                if should_block(outcome):
+                    status = "failed"
+                    if not error_message:
+                        error_message = (
+                            f"Gate {outcome.gate_id} failed (BLOCKER) at end-run"  # noqa: E501
+                        )
+        except Exception as exc:  # pragma: no cover
+            # End-run gate execution itself should not crash the runner.
+            status = "failed"
+            if not error_message:
+                error_message = str(exc)[:240]
+
+        writer.write(
+            EventType.RUN_FINISHED,
+            status=status,
+        )
         # 2) finish run
         finish_vars = {
             "run_id": run_id,
             "status": status,
-            "rows_processed": str(total_rows) if rows_processed is None else str(rows_processed),
+            "rows_processed": str(total_rows)
+            if rows_processed is None
+            else str(rows_processed),
             "error_message": error_message,
         }
         _run_psql_file(ctx.database_url, SQL_RUN_FINISH, vars=finish_vars, quiet=False)
