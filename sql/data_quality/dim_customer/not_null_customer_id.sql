@@ -1,0 +1,8 @@
+-- DQ: dim_customer.customer_id NOT NULL
+-- Contract:
+-- - 0 rows => PASS
+-- - 1+ rows => FAIL
+select customer_id
+from dim_customer
+where customer_id is null
+limit 1;

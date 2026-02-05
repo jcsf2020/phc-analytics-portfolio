@@ -31,7 +31,6 @@ from __future__ import annotations
 import argparse
 import os
 import re
-import subprocess
 import sys
 import uuid
 from dataclasses import dataclass
@@ -46,6 +45,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from orchestration.events.event_types import EventType
 from orchestration.events.writer import EventStreamWriter
+from orchestration.db.psql import run_psql_file
 from orchestration.gates.registry import (
     get_end_run_gates,
     get_post_step_gates,
@@ -53,6 +53,12 @@ from orchestration.gates.registry import (
 )
 from orchestration.gates.runner import run_gate, should_block
 from orchestration.steps.registry import get_steps
+from orchestration.dq.registry import (
+    get_pre_run_dq_checks,
+    get_post_step_dq_checks,
+    get_end_run_dq_checks,
+)
+from orchestration.dq.contract import DQRunner, should_block as dq_should_block
 
 OBS_SQL_DIR = REPO_ROOT / "observability" / "sql"
 
@@ -73,46 +79,6 @@ def _require_file(path: Path) -> None:
         raise FileNotFoundError(f"Missing required file: {path}")
 
 
-def _run_psql_file(
-    database_url: str,
-    sql_file: Path,
-    *,
-    vars: dict[str, str],
-    quiet: bool = False,
-) -> str:
-    """
-    Execute a .sql file via psql and return stdout.
-
-    We rely on psql variable binding: -v key='value'
-    """
-    _require_file(sql_file)
-
-    cmd: list[str] = [
-        "psql",
-        database_url,
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-f",
-        str(sql_file),
-    ]
-    for k, v in vars.items():
-        cmd.extend(["-v", f"{k}={v}"])
-
-    if quiet:
-        # -q: quiet; -t: tuples-only; -A: unaligned
-        cmd.insert(2, "-qAt")
-
-    proc = subprocess.run(
-        cmd,
-        text=True,
-        capture_output=True,
-    )
-    if proc.returncode != 0:
-        stderr = (proc.stderr or "").strip()
-        stdout = (proc.stdout or "").strip()
-        msg = stderr if stderr else stdout
-        raise RuntimeError(f"psql failed ({sql_file.name}): {msg}")
-    return (proc.stdout or "").strip()
 
 
 _RUN_ID_RE = re.compile(
@@ -137,7 +103,7 @@ def cmd_health(ctx: RunContext, max_age_minutes: int) -> int:
     - 0 rows => healthy (exit 0)
     - 1+ rows => unhealthy/stale (exit 2)
     """
-    out = _run_psql_file(
+    out = run_psql_file(
         ctx.database_url,
         SQL_HEALTH_LAST_RUN,
         vars={
@@ -187,6 +153,15 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
                 outcome = run_gate(gate=gate, ctx=ctx, writer=writer)
                 if should_block(outcome):
                     raise RuntimeError(f"Gate {outcome.gate_id} failed (BLOCKER)")
+            dq_runner = DQRunner()
+            for outcome in dq_runner.run(
+                checks=get_pre_run_dq_checks(),
+                ctx=ctx,
+            ):
+                if dq_should_block(outcome):
+                    raise RuntimeError(
+                        f"DQ {outcome.check_id} failed (BLOCKER) pre-run"
+                    )
 
             # We do NOT execute steps in dry-run; we only validate wiring.
 
@@ -204,6 +179,17 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
                             error_message = (
                                 f"Gate {outcome.gate_id} failed (BLOCKER) at end-run"
                             )
+                dq_runner = DQRunner()
+                for outcome in dq_runner.run(
+                    checks=get_end_run_dq_checks(),
+                    ctx=ctx,
+                ):
+                    if dq_should_block(outcome):
+                        status = "failed"
+                        if not error_message:
+                            error_message = (
+                                f"DQ {outcome.check_id} failed (BLOCKER) at end-run"
+                            )
             except Exception as exc:  # pragma: no cover
                 status = "failed"
                 if not error_message:
@@ -215,7 +201,7 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
         return 0 if status != "failed" else 1
 
     # 1) start run
-    start_out = _run_psql_file(
+    start_out = run_psql_file(
         ctx.database_url,
         SQL_RUN_START,
         vars={
@@ -242,6 +228,13 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
             outcome = run_gate(gate=gate, ctx=ctx, writer=writer)
             if should_block(outcome):
                 raise RuntimeError(f"Gate {outcome.gate_id} failed (BLOCKER)")
+        dq_runner = DQRunner()
+        for outcome in dq_runner.run(
+            checks=get_pre_run_dq_checks(),
+            ctx=ctx,
+        ):
+            if dq_should_block(outcome):
+                raise RuntimeError(f"DQ {outcome.check_id} failed (BLOCKER) pre-run")
 
         # 1) pipeline steps
         for step in get_steps():
@@ -265,6 +258,14 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
                         raise RuntimeError(
                             f"Gate {outcome.gate_id} failed (BLOCKER) after step {step.name}"
                         )
+                for outcome in dq_runner.run(
+                    checks=get_post_step_dq_checks(step_id=step.name),
+                    ctx=ctx,
+                ):
+                    if dq_should_block(outcome):
+                        raise RuntimeError(
+                            f"DQ {outcome.check_id} failed (BLOCKER) after step {step.name}"
+                        )
             except Exception:
                 writer.write(EventType.STEP_FAILED, step_id=step.name)
                 raise
@@ -281,6 +282,17 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
                     if not error_message:
                         error_message = (
                             f"Gate {outcome.gate_id} failed (BLOCKER) at end-run"  # noqa: E501
+                        )
+            dq_runner = DQRunner()
+            for outcome in dq_runner.run(
+                checks=get_end_run_dq_checks(),
+                ctx=ctx,
+            ):
+                if dq_should_block(outcome):
+                    status = "failed"
+                    if not error_message:
+                        error_message = (
+                            f"DQ {outcome.check_id} failed (BLOCKER) at end-run"
                         )
         except Exception as exc:  # pragma: no cover
             # End-run gate execution itself should not crash the runner.
@@ -301,7 +313,7 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
             else str(rows_processed),
             "error_message": error_message,
         }
-        _run_psql_file(ctx.database_url, SQL_RUN_FINISH, vars=finish_vars, quiet=False)
+        run_psql_file(ctx.database_url, SQL_RUN_FINISH, vars=finish_vars, quiet=False)
 
     return 0 if status == "success" else 1
 
