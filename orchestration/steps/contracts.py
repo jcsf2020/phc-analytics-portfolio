@@ -10,7 +10,10 @@ if TYPE_CHECKING:
 class Step(Protocol):
     """Pipeline step contract (tool-agnostic)."""
 
-    name: str
+    @property
+    def name(self) -> str:
+        """Stable step identifier (read-only)."""
+        ...
 
     def run(self, ctx: "RunContext") -> int:
         """Execute step and return rows_processed (>=0)."""
