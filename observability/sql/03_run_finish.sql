@@ -25,11 +25,7 @@ with upd as (
             2
         ),
         rows_processed = nullif(btrim(:'rows_processed'), '')::bigint,
-        error_message = case
-            when :'error_message' is null
-            or btrim(:'error_message') = '' then null
-            else btrim(:'error_message')
-        end
+        error_message = coalesce(nullif(btrim(:'error_message'), ''), '')
     where run_id = (:'run_id')::uuid
     returning run_id,
         pipeline_name,

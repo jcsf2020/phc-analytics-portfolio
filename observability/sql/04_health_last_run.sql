@@ -25,7 +25,13 @@ last_run as (
         l.status,
         l.started_at,
         l.finished_at,
-        l.duration_seconds,
+        case
+            when l.finished_at is null then null
+            else extract(
+                epoch
+                from (l.finished_at - l.started_at)
+            )::numeric
+        end as duration_seconds,
         l.rows_processed,
         l.error_message
     from analytics.pipeline_run_log l
