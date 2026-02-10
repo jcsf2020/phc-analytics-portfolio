@@ -1,4 +1,4 @@
--- Data Quality checks — analytics.dim_customer (SCD2)
+-- Data Quality checks - analytics.dim_customer (SCD2)
 -- Regra geral: OK = 0 rows (qualquer row retornada = violacao)
 
 -- Q1) 1 versao current por customer_nk

@@ -34,12 +34,12 @@ CREATE TABLE IF NOT EXISTS analytics.dim_customer (
     CHECK ((is_current = TRUE AND valid_to IS NULL) OR (is_current = FALSE AND valid_to IS NOT NULL))
 );
 
--- 1 versão atual por NK
+-- 1 versao atual por NK
 CREATE UNIQUE INDEX IF NOT EXISTS ux_dim_customer_current
   ON analytics.dim_customer (customer_nk)
   WHERE is_current = TRUE;
 
--- evita duplicar versões no mesmo instante
+-- evita duplicar versoes no mesmo instante
 CREATE UNIQUE INDEX IF NOT EXISTS ux_dim_customer_nk_from
   ON analytics.dim_customer (customer_nk, valid_from);
 

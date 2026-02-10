@@ -44,19 +44,22 @@ docker compose down
 ## Architecture
 
 ### Data Flow (Medallion Pattern)
-```
+
+``text
 Source (Bronze) → Normalize (Silver) → Model (Gold) → Aggregates → Outputs/BI
      ↓                  ↓                   ↓              ↓
 Raw payloads      Validated +         Star schema     Precomputed
   (mock)          standardized         (Kimball)       metrics
-```
+``
 
 ### Dimensional Model (Kimball)
+
 - **Dimensions:** `dim_customer` (SCD Type 2), `dim_product`, `dim_date`
 - **Facts:** `fact_orders`, `fact_order_lines` (grain: 1 row = 1 atomic event)
 - Surrogate keys (`*_key`) + natural keys; foreign keys link facts to dims
 
 ### Key Directories
+
 - `src/phc_analytics/` - Main Python package
   - `integrations/` - External system clients (PrestaShop mock, Odoo stubs)
   - `transformations/` - ETL: normalize → dims/facts → aggregates
@@ -66,6 +69,7 @@ Raw payloads      Validated +         Star schema     Precomputed
 - `tests/` - pytest test suite
 
 ### Entry Points
+
 1. `run_pipeline.py` - MVP orchestration (extract → normalize → model → write CSVs)
 2. `orchestration/run_pipeline.py` - Production orchestrator with observability
 3. `app.py` - Streamlit dashboard
@@ -83,6 +87,7 @@ Raw payloads      Validated +         Star schema     Precomputed
 ## CI/CD
 
 GitHub Actions workflow (`.github/workflows/data-quality.yml`):
+
 - Triggers on push to `main` and all PRs
 - Uses ephemeral PostgreSQL (no external DB dependencies)
 - Seeds schema via `sql/ci/seed_dq_db.sql`

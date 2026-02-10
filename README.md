@@ -145,6 +145,36 @@ This project was developed iteratively using a sprint-based approach.
   - Runs `*.sql` files in sorted order (`01_`, `02_`, ...).
   - Checks are valid when every query returns **0 rows**.
 
+## Recent Sprints — Runtime & Execution Discipline
+
+- **Sprint 18 — Pipeline Observability**
+  - Run-level logging (start / finish / status)
+  - SQL-based lifecycle tracking
+  - Health queries as execution gates
+
+- **Sprint 19–20 — Deterministic Orchestration & DQ Gates**
+  - Python-based orchestrator (SQL-first mindset)
+  - Static step registry (deterministic execution order)
+  - SQL-based data quality checks as blocking gates
+  - Fail-fast execution semantics
+
+- **Sprint 21 — Architecture Contracts**
+  - Orchestrator mental model
+  - Step execution contract
+  - Data Quality contract (0 rows = PASS, severity-aware)
+  - Explicit separation between orchestration and SQL logic
+
+- **Sprint 22 — Executable Runtime Contracts**
+  - Contracts wired into real execution
+  - Structured event stream per run
+  - Baseline runtime health gate
+
+- **Sprint 23–24 — Runtime Hardening & Enforcement**
+  - End-to-end run lifecycle enforcement (start → gates → finish)
+  - SQL-first data quality executed as a first-class pipeline step
+  - Health checks resilient to bootstrap scenarios
+  - Execution correctness enforced by design (not convention)
+
 ## Data Quality as a First-Class Citizen
 
 In this project, data quality is treated as an explicit, versioned engineering
