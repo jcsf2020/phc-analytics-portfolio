@@ -134,8 +134,8 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
     For now: no steps. This is a scaffold to wire in step execution next.
     """
     if dry_run:
-        # Dry-run should still exercise the runtime wiring (events + gates)
-        # while performing zero database writes.
+        # Dry-run: exercise only EventStreamWriter wiring.
+        # No gates, no DQ checks, no SQL, no database access.
         run_id = str(uuid.uuid4())
         writer = EventStreamWriter(
             pipeline=ctx.pipeline_name,
@@ -144,61 +144,9 @@ def cmd_run(ctx: RunContext, rows_processed: Optional[int], dry_run: bool) -> in
         )
         writer.write(EventType.RUN_STARTED)
         print(f"run_id={run_id}")
-
-        status = "dry_run"
-        error_message = ""
-        try:
-            # Pre-run gates (fail-fast on BLOCKER)
-            for gate in iter_pre_run_gates():
-                outcome = run_gate(gate=gate, ctx=ctx, writer=writer)
-                if should_block(outcome):
-                    raise RuntimeError(f"Gate {outcome.gate_id} failed (BLOCKER)")
-            dq_runner = DQRunner()
-            for outcome in dq_runner.run(
-                checks=get_pre_run_dq_checks(),
-                ctx=ctx,
-            ):
-                if dq_should_block(outcome):
-                    raise RuntimeError(
-                        f"DQ {outcome.check_id} failed (BLOCKER) pre-run"
-                    )
-
-            # We do NOT execute steps in dry-run; we only validate wiring.
-
-        except Exception as exc:  # pragma: no cover
-            status = "failed"
-            error_message = str(exc)[:240]
-        finally:
-            # End-run gates must still execute for diagnostics.
-            try:
-                for gate in get_end_run_gates():
-                    outcome = run_gate(gate=gate, ctx=ctx, writer=writer)
-                    if should_block(outcome):
-                        status = "failed"
-                        if not error_message:
-                            error_message = (
-                                f"Gate {outcome.gate_id} failed (BLOCKER) at end-run"
-                            )
-                dq_runner = DQRunner()
-                for outcome in dq_runner.run(
-                    checks=get_end_run_dq_checks(),
-                    ctx=ctx,
-                ):
-                    if dq_should_block(outcome):
-                        status = "failed"
-                        if not error_message:
-                            error_message = (
-                                f"DQ {outcome.check_id} failed (BLOCKER) at end-run"
-                            )
-            except Exception as exc:  # pragma: no cover
-                status = "failed"
-                if not error_message:
-                    error_message = str(exc)[:240]
-
-            writer.write(EventType.RUN_FINISHED, status=status)
-
+        writer.write(EventType.RUN_FINISHED, status="dry_run")
         print("DRY RUN: skipping database writes")
-        return 0 if status != "failed" else 1
+        return 0
 
     # 1) start run
     start_out = run_psql_file(
@@ -347,20 +295,23 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str]) -> int:
     args = _parse_args(argv)
 
-    if not args.database_url:
-        print(
-            "ERROR: DATABASE_URL is empty. Export DATABASE_URL or pass --database-url.",
-            file=sys.stderr,
-        )
-        return 2
+    dry_run = getattr(args, "dry_run", False)
 
-    # Ensure required SQL assets exist (fail fast with clear errors).
-    _require_file(SQL_RUN_START)
-    _require_file(SQL_RUN_FINISH)
-    _require_file(SQL_HEALTH_LAST_RUN)
+    if not dry_run:
+        if not args.database_url:
+            print(
+                "ERROR: DATABASE_URL is empty. Export DATABASE_URL or pass --database-url.",
+                file=sys.stderr,
+            )
+            return 2
+
+        # Ensure required SQL assets exist (fail fast with clear errors).
+        _require_file(SQL_RUN_START)
+        _require_file(SQL_RUN_FINISH)
+        _require_file(SQL_HEALTH_LAST_RUN)
 
     ctx = RunContext(
-        database_url=args.database_url,
+        database_url=args.database_url or "",
         pipeline_name=args.pipeline,
         environment=args.env,
     )
@@ -369,7 +320,7 @@ def main(argv: list[str]) -> int:
         return cmd_health(ctx, args.max_age_minutes)
 
     if args.command == "run":
-        return cmd_run(ctx, args.rows, args.dry_run)
+        return cmd_run(ctx, args.rows, dry_run)
 
     print(f"ERROR: unknown command: {args.command}", file=sys.stderr)
     return 2

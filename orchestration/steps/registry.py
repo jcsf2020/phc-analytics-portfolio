@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class DQFolderStep:
+class DQFolderStep(Step):
     """Run SQL-based data-quality checks from a folder.
 
     Contract per check file:
@@ -19,9 +19,13 @@ class DQFolderStep:
     - 1+ rows returned => FAIL
     """
 
-    name: str = "data_quality"
+    step_name: str = "data_quality"
     folder: Path = Path("sql/data_quality")
     glob_pattern: str = "**/*.sql"
+
+    @property
+    def name(self) -> str:
+        return self.step_name
 
     def run(self, ctx: "RunContext") -> int:
         from orchestration.db.psql import run_psql_file
