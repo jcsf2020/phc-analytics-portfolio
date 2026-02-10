@@ -318,6 +318,12 @@ python -m orchestration.run_pipeline \
 
 Health check (last success freshness):
 
+**GitHub Actions (Azure Smoke)**
+- Add repo secret `AZURE_DATABASE_URL` (full connection string incl. user/pass + `sslmode=require`)
+- Workflow: `.github/workflows/azure-smoke.yml`
+- Runs: bootstrap (idempotent) + `run` + `health`
+
+
 ```bash
 python -m orchestration.run_pipeline \
   --pipeline phc_analytics \
