@@ -294,6 +294,39 @@ Why this matters (market signal):
 
 ---
 
+### Azure PostgreSQL (Flexible Server) runbook
+
+This repo supports running the same pipeline against an Azure PostgreSQL (Flexible Server) instance.
+
+**Env contract**
+- `DATABASE_URL` = default connection string (typically local / CI).
+- `AZURE_DATABASE_URL` = Azure connection string (used explicitly when you want to target Azure).
+
+**Recommended usage**
+Keep `DATABASE_URL` for local/dev and pass Azure explicitly via `--database-url`.
+
+Example (one-off smoke run on Azure):
+
+```bash
+export AZURE_DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DB?sslmode=require"
+python -m orchestration.run_pipeline \
+  --pipeline phc_analytics \
+  --env prod \
+  --database-url "$AZURE_DATABASE_URL" \
+  run; echo "exit=$?"
+```
+
+Health check (last success freshness):
+
+```bash
+python -m orchestration.run_pipeline \
+  --pipeline phc_analytics \
+  --env prod \
+  --database-url "$AZURE_DATABASE_URL" \
+  health --max-age-minutes 1440; echo "exit=$?"
+```
+
+
 ## Integrations
 
 ### Odoo ERP Integration (Addon)
