@@ -175,6 +175,16 @@ This project was developed iteratively using a sprint-based approach.
   - Health checks resilient to bootstrap scenarios
   - Execution correctness enforced by design (not convention)
 
+- **Sprint 27 — Governance (SLO Compliance 14d)**
+  - Added a reproducible governance SQL asset:
+    `sql/analytics/governance/slo_compliance_14d.sql`
+  - View: `analytics.slo_compliance_14d`
+  - Injects pipeline identity via a single-row CTE (`pipeline_scope`) and `CROSS JOIN`
+  - Uses global runtime KPIs from `analytics.runtime_kpis_14d` (no pipeline/window columns)
+  - Uses incident-based MTTR from `analytics.mttr_kpis_14d.mttr_avg_seconds`
+  - Joins versioned SLO targets from `analytics.slo_targets` selecting the latest `effective_from <= now()`
+  - Output includes targets, actuals, deltas and status flags (`ok` / `violation` / `no_target`) with overall `compliant` / `violated`
+
 ## Data Quality as a First-Class Citizen
 
 In this project, data quality is treated as an explicit, versioned engineering
