@@ -10,9 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      DATABASE_URL: ${{ secrets.AZURE_DATABASE_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL_ADMIN }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate DATABASE_URL is set
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "ERROR: DATABASE_URL is empty. Configure GitHub secret DATABASE_URL_ADMIN."
+            exit 1
+          fi
 
       - name: Validate python imports
         run: python -m compileall -q orchestration
