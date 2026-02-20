@@ -9,25 +9,47 @@ jobs:
   azure-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:15
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: phc
+          POSTGRES_PASSWORD: phc
+          POSTGRES_DB: phc_analytics
+        options: >-
+          --health-cmd "pg_isready -U phc -d phc_analytics"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL_ADMIN }}
+      DATABASE_URL: postgresql://phc:phc@localhost:5432/phc_analytics?sslmode=disable
     steps:
       - uses: actions/checkout@v4
-
-      - name: Validate DATABASE_URL is set
-        run: |
-          if [ -z "${DATABASE_URL}" ]; then
-            echo "ERROR: DATABASE_URL is empty. Configure GitHub secret DATABASE_URL_ADMIN."
-            exit 1
-          fi
-
-      - name: Validate python imports
-        run: python -m compileall -q orchestration
 
       - name: Install psql client
         run: |
           sudo apt-get update -y
           sudo apt-get install -y postgresql-client
+
+      - name: Wait for Postgres
+        run: |
+          echo "Waiting for Postgres to be ready..."
+          for i in $(seq 1 12); do
+            pg_isready -h localhost -p 5432 -U phc -d phc_analytics && break
+            echo "  attempt $i/12 -- retrying in 5s"
+            sleep 5
+          done
+          pg_isready -h localhost -p 5432 -U phc -d phc_analytics \
+            || { echo "::error::Postgres did not become ready within 60s"; exit 1; }
+          psql "$DATABASE_URL" -c "SELECT 1;" > /dev/null
+
+      # --- Existing pipeline steps ---
+      - name: Validate python imports
+        run: python -m compileall -q orchestration
 
       - name: Bootstrap required schemas/tables (idempotent)
         run: |
