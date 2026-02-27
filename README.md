@@ -11,6 +11,17 @@ Portfolio deliverable of a data engineering / analytics project focused on:
 > It intentionally avoids committing local/editor artifacts
 > and binary release files.
 
+## Evidence Snapshot (2026-02-27)
+
+- pytest: **7 passed**
+- orchestrator: `phc_analytics` (env `local`, rows `0`) on **Docker Postgres**
+- observability: `analytics.pipeline_run_log` (run-level)
+- data quality: SQL DQ gates executed (0-rows contract)
+
+Evidence:
+- Run ID: `e3ea7fbe-eaa8-45f8-b540-350bc3414c87`
+- Evidence ZIP SHA-256: `789745e9edd9eab5c4f80b23cc90b62e6bd67931baf8f44ef017a35b8b17379a`
+
 ## Tech Stack
 
 - **Python** for orchestration / pipeline glue
